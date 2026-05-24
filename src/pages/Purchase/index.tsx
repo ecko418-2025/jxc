@@ -5,7 +5,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber, Select, Space, Tag,
-  Card, message, DatePicker, Popconfirm, Typography, Row, Col, Divider, Spin,
+  Card, message, DatePicker, Popconfirm, Typography, Row, Col, Divider
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, CheckOutlined, InboxOutlined,
@@ -15,8 +15,11 @@ import { purchaseOrderDB, supplierDB, productDB, inventoryDB } from '../../datab
 import type { PurchaseOrder, PurchaseItem, Supplier, Product } from '../../database/types';
 import { generateId } from '../../database/db';
 import dayjs from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
+dayjs.extend(isBetween);
 
 const { Text } = Typography;
+const { RangePicker } = DatePicker;
 
 const PurchasePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -29,6 +32,9 @@ const PurchasePage: React.FC = () => {
   const [detailOrder, setDetailOrder] = useState<PurchaseOrder | null>(null);
   const [form] = Form.useForm();
   const [items, setItems] = useState<PurchaseItem[]>([]);
+
+  const [searchText, setSearchText] = useState('');
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
 
   const refreshData = useCallback(async () => {
     try {
@@ -164,19 +170,31 @@ const PurchasePage: React.FC = () => {
       title: '采购单号',
       dataIndex: 'orderNo',
       width: 160,
+      sorter: (a: any, b: any) => a.orderNo.localeCompare(b.orderNo),
       render: (no: string) => <Text style={{ fontFamily: 'monospace', color: 'var(--text-accent)' }}>{no}</Text>,
     },
     {
       title: '供应商',
       dataIndex: 'supplierId',
       width: 180,
+      sorter: (a: any, b: any) => {
+        const sA = suppliers.find(s => s.id === a.supplierId)?.name || '';
+        const sB = suppliers.find(s => s.id === b.supplierId)?.name || '';
+        return sA.localeCompare(sB);
+      },
       render: (id: string) => suppliers.find(s => s.id === id)?.name || '—',
     },
-    { title: '日期', dataIndex: 'orderDate', width: 110 },
+    { 
+      title: '日期', 
+      dataIndex: 'orderDate', 
+      width: 110,
+      sorter: (a: any, b: any) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime(),
+    },
     {
       title: '金额',
       dataIndex: 'totalAmount',
       width: 120,
+      sorter: (a: any, b: any) => Number(a.totalAmount) - Number(b.totalAmount),
       render: (v: number) => <Text strong style={{ color: '#f59e0b' }}>¥{Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>,
     },
     {
@@ -225,20 +243,46 @@ const PurchasePage: React.FC = () => {
 
   return (
     <Card size="small">
-      <Space style={{ marginBottom: 16 }}>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-          form.resetFields();
-          form.setFieldsValue({ orderDate: dayjs() });
-          setItems([]);
-          setModalOpen(true);
-        }}>
-          新建采购单
-        </Button>
+      <Space style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
+        <Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+            form.resetFields();
+            form.setFieldsValue({ orderDate: dayjs() });
+            setItems([]);
+            setModalOpen(true);
+          }}>
+            新建采购单
+          </Button>
+        </Space>
+        <Space>
+          <RangePicker 
+            onChange={(dates) => setDateRange(dates as any)} 
+            allowClear 
+          />
+          <Input.Search
+            placeholder="搜索单号/供应商"
+            allowClear
+            style={{ width: 200 }}
+            onSearch={setSearchText}
+            onChange={e => !e.target.value && setSearchText('')}
+          />
+        </Space>
       </Space>
 
       <Table
         loading={loading}
-        dataSource={[...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())}
+        dataSource={[...orders]
+          .filter(o => {
+            if (searchText) {
+              const supplier = suppliers.find(s => s.id === o.supplierId)?.name || '';
+              if (!o.id.includes(searchText) && !supplier.includes(searchText)) return false;
+            }
+            if (dateRange && dateRange[0] && dateRange[1]) {
+              if (!dayjs(o.orderDate).isBetween(dateRange[0], dateRange[1], 'day', '[]')) return false;
+            }
+            return true;
+          })
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())}
         columns={columns}
         rowKey="id"
         size="small"

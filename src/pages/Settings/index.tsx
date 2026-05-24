@@ -3,15 +3,16 @@
 // ========================================
 
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Space, Typography, Modal, message, Row, Col, Statistic, Upload, Alert, Spin } from 'antd';
+import { Card, Typography, Row, Col, Statistic, Button, message, Space, Upload, Alert, Modal, Divider, Spin } from 'antd';
 import {
   DownloadOutlined, UploadOutlined, DeleteOutlined,
   DatabaseOutlined, ExclamationCircleOutlined,
   CloudDownloadOutlined, CloudUploadOutlined,
-  InfoCircleOutlined,
+  InfoCircleOutlined, SettingOutlined,
 } from '@ant-design/icons';
 import { dataUtils, productDB, categoryDB, supplierDB, customerDB, salesOrderDB, purchaseOrderDB } from '../../database/db';
 import { seedDemoData } from '../../database/seed';
+import { exportAllToExcel, restoreFromExcel } from '../../utils/excel';
 
 const { Text, Paragraph } = Typography;
 
@@ -56,13 +57,48 @@ const SettingsPage: React.FC = () => {
   }, []);
 
   // Backup data
-  const handleBackup = () => {
-    message.info('纯异步云端架构暂不支持前端全量数据备份，请在云端控制台操作。');
+  const handleBackup = async () => {
+    try {
+      message.loading({ content: '正在生成备份文件，请稍候...', key: 'backup' });
+      await exportAllToExcel();
+      message.success({ content: '数据备份成功！', key: 'backup' });
+    } catch (err: any) {
+      message.error({ content: '备份失败: ' + (err.message || ''), key: 'backup' });
+    }
   };
 
   // Restore data
-  const handleRestore = (file: File) => {
-    message.info('纯异步云端架构暂不支持前端全量数据恢复，请在云端控制台操作。');
+  const handleRestore = async (file: File) => {
+    Modal.confirm({
+      title: '确认恢复数据？',
+      content: `确定要从 ${file.name} 恢复数据吗？这可能会覆盖当前数据库中编码或名称相同的记录。此操作不可逆！`,
+      icon: <ExclamationCircleOutlined />,
+      okText: '确认导入',
+      cancelText: '取消',
+      async onOk() {
+        try {
+          message.loading({ content: '正在恢复数据，这可能需要一些时间...', key: 'restore', duration: 0 });
+          const logs = await restoreFromExcel(file);
+          message.destroy('restore');
+          Modal.success({
+            title: '数据恢复成功',
+            content: (
+              <div>
+                <p>恢复操作已完成，以下是处理结果：</p>
+                <ul>
+                  {logs.map((log, i) => <li key={i}>{log}</li>)}
+                </ul>
+              </div>
+            ),
+            onOk() {
+              window.location.reload();
+            }
+          });
+        } catch (err: any) {
+          message.error({ content: '恢复失败: ' + (err.message || ''), key: 'restore' });
+        }
+      }
+    });
     return false;
   };
 
@@ -141,7 +177,7 @@ const SettingsPage: React.FC = () => {
         <Col xs={24} lg={12}>
           <Card title={<Space><CloudDownloadOutlined /> 数据备份</Space>} size="small">
             <Paragraph style={{ color: 'var(--text-secondary)' }}>
-              将所有数据导出为 JSON 文件，可用于数据迁移或灾难恢复。（该功能已转至云端控制台）
+              用 Excel 的形式备份数据库里所有的品类、产品、客户、供应商四个核心大表。
             </Paragraph>
             <Button type="default" icon={<DownloadOutlined />} onClick={handleBackup} size="large" block>
               备份数据
@@ -152,9 +188,13 @@ const SettingsPage: React.FC = () => {
         <Col xs={24} lg={12}>
           <Card title={<Space><CloudUploadOutlined /> 数据恢复</Space>} size="small">
             <Paragraph style={{ color: 'var(--text-secondary)' }}>
-              从备份文件恢复数据。恢复操作会覆盖当前数据。（该功能已转至云端控制台）
+              上传修改后的 Excel 备份文件进行数据恢复。匹配到的数据会被自动覆盖更新，新数据会被添加。
             </Paragraph>
-            <Upload accept=".json" maxCount={1} beforeUpload={handleRestore} showUploadList={false}>
+        <Upload accept=".xlsx" showUploadList={false} beforeUpload={() => false} onChange={(info) => {
+          if (info.fileList.length > 0) {
+            handleRestore(info.fileList[0].originFileObj as File);
+          }
+        }}>
               <Button type="default" icon={<UploadOutlined />} size="large" block>
                 选择备份文件恢复
               </Button>

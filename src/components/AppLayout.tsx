@@ -3,7 +3,7 @@
 // ========================================
 
 import React, { useState } from 'react';
-import { Layout, Menu, Typography, Space, Badge, Avatar, Tooltip } from 'antd';
+import { Layout, Menu, Typography, Space, Badge, Avatar, Tooltip, Dropdown } from 'antd';
 import {
   DashboardOutlined,
   ShoppingOutlined,
@@ -41,8 +41,11 @@ const AppLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const lowStockCount = inventoryDB.getLowStockProducts().length;
+  const [lowStockCount, setLowStockCount] = useState(0);
 
+  React.useEffect(() => {
+    inventoryDB.getLowStockProducts().then(res => setLowStockCount(res.length)).catch(() => {});
+  }, [location.pathname]);
   const currentTitle = menuItems.find(m => m.key === location.pathname)?.label || '数据看板';
 
   return (
@@ -141,30 +144,46 @@ const AppLayout: React.FC = () => {
           </Space>
 
           <Space size={20}>
-            <Tooltip title={lowStockCount > 0 ? `${lowStockCount} 个产品库存不足` : '库存正常'}>
-              <Badge count={lowStockCount} size="small">
-                <BellOutlined style={{ fontSize: 18, color: 'var(--text-secondary)', cursor: 'pointer' }} />
+            <Tooltip title={lowStockCount > 0 ? `${lowStockCount} 个产品库存不足，点击查看` : '库存正常，点击前往库存管理'}>
+              <Badge count={lowStockCount} size="small" offset={[-2, 2]}>
+                <BellOutlined 
+                  style={{ fontSize: 18, color: 'var(--text-secondary)', cursor: 'pointer', transition: 'color 0.3s' }} 
+                  onClick={() => navigate('/inventory')}
+                />
               </Badge>
             </Tooltip>
-            <Tooltip title="退出登录">
+            
+            <Tooltip title="安全退出">
               <LogoutOutlined 
-                style={{ fontSize: 18, color: 'var(--error-color)', cursor: 'pointer' }} 
+                style={{ fontSize: 18, color: 'var(--error-color)', cursor: 'pointer', transition: 'opacity 0.3s' }} 
                 onClick={async () => {
                   await auth.signOut();
                   window.location.reload();
                 }}
               />
             </Tooltip>
-            <Avatar
-              size={32}
-              style={{
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                cursor: 'pointer',
-                fontSize: 14,
+
+            <Dropdown
+              menu={{
+                items: [
+                  { key: 'settings', label: '系统设置', onClick: () => navigate('/settings') },
+                  { type: 'divider' },
+                  { key: 'logout', label: '退出登录', danger: true, onClick: async () => { await auth.signOut(); window.location.reload(); } }
+                ]
               }}
+              placement="bottomRight"
             >
-              管
-            </Avatar>
+              <Avatar
+                size={32}
+                style={{
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                }}
+              >
+                管
+              </Avatar>
+            </Dropdown>
           </Space>
         </Header>
 

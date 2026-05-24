@@ -207,18 +207,25 @@ const ProductsPage: React.FC = () => {
       title: '编码',
       dataIndex: 'sku',
       width: 100,
+      sorter: (a: Product, b: Product) => a.sku.localeCompare(b.sku),
       render: (sku: string) => <Text style={{ color: 'var(--text-accent)', fontFamily: 'monospace' }}>{sku}</Text>,
     },
     {
       title: '产品名称',
       dataIndex: 'name',
       width: 180,
+      sorter: (a: Product, b: Product) => a.name.localeCompare(b.name),
       render: (name: string) => <Text strong style={{ color: 'var(--text-primary)' }}>{name}</Text>,
     },
     {
       title: '品类',
       dataIndex: 'categoryId',
       width: 120,
+      sorter: (a: Product, b: Product) => {
+        const catA = categories.find(c => c.id === a.categoryId)?.name || '';
+        const catB = categories.find(c => c.id === b.categoryId)?.name || '';
+        return catA.localeCompare(catB);
+      },
       render: (catId: string) => {
         const cat = categories.find(c => c.id === catId);
         return <Tag color="blue">{cat?.name || '未分类'}</Tag>;
@@ -226,25 +233,37 @@ const ProductsPage: React.FC = () => {
     },
     { title: '规格', dataIndex: 'spec', width: 100 },
     { title: '单位', dataIndex: 'unit', width: 60 },
-    { title: '品牌', dataIndex: 'brand', width: 80 },
+    { 
+      title: '品牌', 
+      dataIndex: 'brand', 
+      width: 80,
+      sorter: (a: Product, b: Product) => (a.brand || '').localeCompare(b.brand || '') 
+    },
     {
       title: '采购价',
       dataIndex: 'purchasePrice',
       width: 90,
+      sorter: (a: Product, b: Product) => Number(a.purchasePrice) - Number(b.purchasePrice),
       render: (v: number) => <Text style={{ color: 'var(--text-secondary)' }}>¥{Number(v).toFixed(2)}</Text>,
     },
     {
       title: '销售价',
       dataIndex: 'salePrice',
       width: 90,
+      sorter: (a: Product, b: Product) => Number(a.salePrice) - Number(b.salePrice),
       render: (v: number) => <Text style={{ color: '#22c55e' }}>¥{Number(v).toFixed(2)}</Text>,
     },
     {
       title: '库存',
       width: 80,
+      sorter: (a: Product, b: Product) => {
+        const qtyA = (inventories.find(i => i.productId === a.id) as any)?.quantity || 0;
+        const qtyB = (inventories.find(i => i.productId === b.id) as any)?.quantity || 0;
+        return qtyA - qtyB;
+      },
       render: (_: unknown, record: Product) => {
-        const inv = inventories.find(i => i.productId === record.id);
-        const qty = inv?.currentQty || 0;
+        const inv = inventories.find(i => i.productId === record.id) as any;
+        const qty = inv?.quantity ?? inv?.currentQty ?? 0;
         const isLow = qty <= record.minStock;
         return (
           <Space>
@@ -459,7 +478,8 @@ const ProductsPage: React.FC = () => {
                   columns={categoryColumns}
                   rowKey="id"
                   size="small"
-                  pagination={{ defaultPageSize: 15, showSizeChanger: true }}
+                  pagination={{ defaultPageSize: 10, showSizeChanger: true }}
+                  scroll={{ x: 1000 }}
                 />
               </Card>
             ),

@@ -5,7 +5,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber, Select, Space, Tag,
-  Card, message, DatePicker, Popconfirm, Typography, Row, Col, Divider, Spin,
+  Card, message, DatePicker, Popconfirm, Typography, Row, Col, Divider
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, CheckOutlined, SendOutlined,
@@ -15,8 +15,11 @@ import { salesOrderDB, customerDB, productDB, inventoryDB } from '../../database
 import type { SalesOrder, SalesItem, Customer, Product, InventoryRecord } from '../../database/types';
 import { generateId } from '../../database/db';
 import dayjs from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
+dayjs.extend(isBetween);
 
 const { Text } = Typography;
+const { RangePicker } = DatePicker;
 
 const SalesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -29,6 +32,9 @@ const SalesPage: React.FC = () => {
   const [detailOrder, setDetailOrder] = useState<SalesOrder | null>(null);
   const [form] = Form.useForm();
   const [items, setItems] = useState<SalesItem[]>([]);
+
+  const [searchText, setSearchText] = useState('');
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
 
   const refreshData = useCallback(async () => {
     try {
@@ -176,19 +182,31 @@ const SalesPage: React.FC = () => {
       title: '销售单号',
       dataIndex: 'orderNo',
       width: 160,
+      sorter: (a: any, b: any) => a.orderNo.localeCompare(b.orderNo),
       render: (no: string) => <Text style={{ fontFamily: 'monospace', color: 'var(--text-accent)' }}>{no}</Text>,
     },
     {
       title: '客户',
       dataIndex: 'customerId',
       width: 180,
+      sorter: (a: any, b: any) => {
+        const cA = customers.find(c => c.id === a.customerId)?.name || '';
+        const cB = customers.find(c => c.id === b.customerId)?.name || '';
+        return cA.localeCompare(cB);
+      },
       render: (id: string) => customers.find(c => c.id === id)?.name || '—',
     },
-    { title: '日期', dataIndex: 'orderDate', width: 110 },
+    { 
+      title: '日期', 
+      dataIndex: 'orderDate', 
+      width: 110,
+      sorter: (a: any, b: any) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime(),
+    },
     {
       title: '金额',
       dataIndex: 'totalAmount',
       width: 120,
+      sorter: (a: any, b: any) => Number(a.totalAmount) - Number(b.totalAmount),
       render: (v: number) => <Text strong style={{ color: '#22c55e' }}>¥{Number(v).toFixed(2)}</Text>,
     },
     {
@@ -245,20 +263,46 @@ const SalesPage: React.FC = () => {
 
   return (
     <Card size="small">
-      <Space style={{ marginBottom: 16 }}>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-          form.resetFields();
-          form.setFieldsValue({ orderDate: dayjs(), discount: 0 });
-          setItems([]);
-          setModalOpen(true);
-        }}>
-          新建销售单
-        </Button>
+      <Space style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
+        <Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+            form.resetFields();
+            form.setFieldsValue({ orderDate: dayjs(), discount: 0 });
+            setItems([]);
+            setModalOpen(true);
+          }}>
+            新建销售单
+          </Button>
+        </Space>
+        <Space>
+          <RangePicker 
+            onChange={(dates) => setDateRange(dates as any)} 
+            allowClear 
+          />
+          <Input.Search
+            placeholder="搜索单号/客户"
+            allowClear
+            style={{ width: 200 }}
+            onSearch={setSearchText}
+            onChange={e => !e.target.value && setSearchText('')}
+          />
+        </Space>
       </Space>
 
       <Table
         loading={loading}
-        dataSource={[...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())}
+        dataSource={[...orders]
+          .filter(o => {
+            if (searchText) {
+              const customer = customers.find(c => c.id === o.customerId)?.name || '';
+              if (!o.id.includes(searchText) && !customer.includes(searchText)) return false;
+            }
+            if (dateRange && dateRange[0] && dateRange[1]) {
+              if (!dayjs(o.orderDate).isBetween(dateRange[0], dateRange[1], 'day', '[]')) return false;
+            }
+            return true;
+          })
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())}
         columns={columns}
         rowKey="id"
         size="small"

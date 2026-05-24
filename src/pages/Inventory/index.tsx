@@ -25,6 +25,7 @@ const InventoryPage: React.FC = () => {
   const [inventories, setInventories] = useState<InventoryRecord[]>([]);
   
   const [searchText, setSearchText] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -73,6 +74,8 @@ const InventoryPage: React.FC = () => {
     };
   });
 
+  const displayData = activeTab === 'low' ? inventoryData.filter(i => i.isLow && i.active) : inventoryData;
+
   const lowStockCount = inventoryData.filter(i => i.isLow && i.active).length;
 
   const handleAdjust = (product: Product) => {
@@ -97,8 +100,8 @@ const InventoryPage: React.FC = () => {
 
   const showLogs = async (product: Product) => {
     setSelectedProduct(product);
-    setLogModalOpen(true);
     setLogsLoading(true);
+    setLogModalOpen(true);
     try {
       const data = await inventoryLogDB.getByProductId(product.id);
       setLogs(data.sort((a, b) => 
@@ -122,6 +125,7 @@ const InventoryPage: React.FC = () => {
       title: '产品名称',
       dataIndex: 'name',
       width: 180,
+      sorter: (a: any, b: any) => a.name.localeCompare(b.name),
       render: (name: string, record: any) => (
         <Space>
           <Text strong>{name}</Text>
@@ -129,7 +133,13 @@ const InventoryPage: React.FC = () => {
         </Space>
       ),
     },
-    { title: '品类', dataIndex: 'categoryName', width: 100, render: (v: string) => <Tag>{v}</Tag> },
+    { 
+      title: '品类', 
+      dataIndex: 'categoryName', 
+      width: 100, 
+      sorter: (a: any, b: any) => a.categoryName.localeCompare(b.categoryName),
+      render: (v: string) => <Tag>{v}</Tag> 
+    },
     { title: '规格', dataIndex: 'spec', width: 90 },
     { title: '单位', dataIndex: 'unit', width: 60 },
     {
@@ -194,6 +204,8 @@ const InventoryPage: React.FC = () => {
   return (
     <div>
       <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
         items={[
           {
             key: 'all',
@@ -221,13 +233,13 @@ const InventoryPage: React.FC = () => {
             onChange={e => !e.target.value && setSearchText('')}
           />
           <Text style={{ color: 'var(--text-muted)' }}>
-            共 {inventoryData.length} 种产品，{lowStockCount} 项库存预警
+            共 {displayData.length} 种产品，{lowStockCount} 项库存预警
           </Text>
         </Space>
 
         <Table
           loading={loading}
-          dataSource={inventoryData}
+          dataSource={displayData}
           columns={columns}
           rowKey="id"
           size="small"
@@ -302,11 +314,14 @@ const InventoryPage: React.FC = () => {
               title: '变动',
               dataIndex: 'quantity',
               width: 80,
-              render: (v: number) => (
-                <Text style={{ color: v > 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
-                  {v > 0 ? '+' : ''}{v}
-                </Text>
-              ),
+              render: (v: number, record: any) => {
+                const amount = record.type === 'out' && v > 0 ? -v : v;
+                return (
+                  <Text style={{ color: amount > 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                    {amount > 0 ? '+' : ''}{amount}
+                  </Text>
+                );
+              },
             },
             {
               title: '余额',

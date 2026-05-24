@@ -17,7 +17,6 @@ import CustomersPage from './pages/Customers';
 import ReportsPage from './pages/Reports';
 import SettingsPage from './pages/Settings';
 import { initCloudBase, auth } from './database/db';
-import { seedDemoData } from './database/seed';
 import LoginPage from './pages/Login';
 
 const App: React.FC = () => {

@@ -23,6 +23,7 @@ const levelColors: Record<string, string> = {
 const CustomersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [searchText, setSearchText] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [form] = Form.useForm();
@@ -46,6 +47,12 @@ const CustomersPage: React.FC = () => {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
+      
+      // Fix null constraints
+      values.address = values.address || '';
+      values.creditLimit = values.creditLimit ? Number(values.creditLimit) : 0;
+      values.remark = values.remark || '';
+
       if (editing) {
         await customerDB.update(editing.id, values);
         message.success('客户信息已更新');
@@ -81,21 +88,35 @@ const CustomersPage: React.FC = () => {
 
   return (
     <Card size="small">
-      <Space style={{ marginBottom: 16 }}>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-          setEditing(null);
-          form.resetFields();
-          form.setFieldsValue({ level: '普通' });
-          setModalOpen(true);
-        }}>
-          新增客户
-        </Button>
-        <Text style={{ color: 'var(--text-muted)' }}>共 {customers.length} 个客户</Text>
+      <Space style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
+        <Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+            setEditing(null);
+            form.resetFields();
+            form.setFieldsValue({ level: '普通' });
+            setModalOpen(true);
+          }}>
+            新增客户
+          </Button>
+        </Space>
+        <Space>
+          <Input.Search
+            placeholder="搜索酒店名称/联系人/电话"
+            allowClear
+            style={{ width: 250 }}
+            onSearch={setSearchText}
+            onChange={e => !e.target.value && setSearchText('')}
+          />
+          <Text style={{ color: 'var(--text-muted)' }}>共 {customers.length} 个客户</Text>
+        </Space>
       </Space>
 
       <Table
         loading={loading}
-        dataSource={customers}
+        dataSource={customers.filter(c => {
+          if (!searchText) return true;
+          return c.name.includes(searchText) || c.contact.includes(searchText) || c.phone.includes(searchText);
+        })}
         rowKey="id"
         size="small"
         pagination={{ defaultPageSize: 15, showSizeChanger: true }}
