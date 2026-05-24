@@ -1,0 +1,9 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "description": "SQL Database API for Hotel Inventory",
+  "main": "index.js",
+  "dependencies": {
+    "mysql2": "^3.6.0"
+  }
+}
