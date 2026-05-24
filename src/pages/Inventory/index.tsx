@@ -5,7 +5,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Table, Card, Tag, Typography, Space, Badge, InputNumber, Button,
-  Modal, Tabs, message, Progress, Input, Spin,
+  Modal, Tabs, message, Progress, Input,
 } from 'antd';
 import {
   WarningOutlined, CheckCircleOutlined, EditOutlined,

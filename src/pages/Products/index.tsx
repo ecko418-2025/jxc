@@ -438,7 +438,7 @@ const ProductsPage: React.FC = () => {
                       columns={productColumns}
                       rowKey="id"
                       size="small"
-                      pagination={{ defaultPageSize: 15, showSizeChanger: true, showSizeChanger: true, showTotal: (total) => `共 ${total} 条` }}
+                      pagination={{ defaultPageSize: 15, showSizeChanger: true, showTotal: (total) => `共 ${total} 条` }}
                       scroll={{ x: 1100 }}
                     />
                   </Card>

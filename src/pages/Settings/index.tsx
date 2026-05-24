@@ -3,14 +3,14 @@
 // ========================================
 
 import React, { useState, useEffect } from 'react';
-import { Card, Typography, Row, Col, Statistic, Button, message, Space, Upload, Alert, Modal, Divider, Spin } from 'antd';
+import { Card, Typography, Row, Col, Statistic, Button, message, Space, Upload, Alert, Modal, Spin } from 'antd';
 import {
   DownloadOutlined, UploadOutlined, DeleteOutlined,
   DatabaseOutlined, ExclamationCircleOutlined,
   CloudDownloadOutlined, CloudUploadOutlined,
-  InfoCircleOutlined, SettingOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
-import { dataUtils, productDB, categoryDB, supplierDB, customerDB, salesOrderDB, purchaseOrderDB } from '../../database/db';
+import { productDB, categoryDB, supplierDB, customerDB, salesOrderDB, purchaseOrderDB } from '../../database/db';
 import { seedDemoData } from '../../database/seed';
 import { exportAllToExcel, restoreFromExcel } from '../../utils/excel';
 
