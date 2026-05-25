@@ -1,5 +1,6 @@
 // 云函数入口文件
 const mysql = require('mysql2/promise');
+const crypto = require('crypto');
 
 // 数据库连接池
 let pool;
@@ -35,12 +36,13 @@ exports.main = async (event, context) => {
         return { code: 200, data: rows.map(r => ({ ...r, parentId: r.parent_id })) };
       }
       case 'createCategory': {
-        const { id, code, name, parentId, description } = payload;
+        const { code, name, parentId, description } = payload;
+        const id = payload.id || crypto.randomUUID();
         await pool.query(
           'INSERT INTO categories (id, code, name, parent_id, description) VALUES (?, ?, ?, ?, ?)',
           [id, code, name, parentId || null, description || '']
         );
-        return { code: 200, message: 'Success' };
+        return { code: 200, message: 'Success', data: { id } };
       }
       case 'updateCategory': {
         const { id, ...updateFields } = payload;
@@ -69,7 +71,8 @@ exports.main = async (event, context) => {
         return { code: 200, data: products };
       }
       case 'createProduct': {
-        const { id, sku, name, categoryId, unit, spec, brand, purchasePrice, salePrice, minStock, active } = payload;
+        const { sku, name, categoryId, unit, spec, brand, purchasePrice, salePrice, minStock, active } = payload;
+        const id = payload.id || crypto.randomUUID();
         await pool.query(
           `INSERT INTO products 
           (id, sku, name, category_id, unit, spec, brand, purchase_price, sale_price, min_stock, active) 
@@ -77,18 +80,19 @@ exports.main = async (event, context) => {
           [id, sku, name, categoryId, unit, spec, brand, purchasePrice, salePrice, minStock, active ? 1 : 0]
         );
         await pool.query('INSERT IGNORE INTO inventory (product_id, current_qty) VALUES (?, 0)', [id]);
-        return { code: 200, message: 'Success' };
+        return { code: 200, message: 'Success', data: { id } };
       }
       case 'bulkCreateProducts': {
         const { products } = payload;
         for (const p of products) {
+          const id = p.id || crypto.randomUUID();
           await pool.query(
             `INSERT IGNORE INTO products 
             (id, sku, name, category_id, unit, spec, brand, purchase_price, sale_price, min_stock, active) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [p.id, p.sku, p.name, p.categoryId, p.unit, p.spec, p.brand, p.purchasePrice, p.salePrice, p.minStock, p.active ? 1 : 0]
+            [id, p.sku, p.name, p.categoryId, p.unit, p.spec, p.brand, p.purchasePrice, p.salePrice, p.minStock, p.active ? 1 : 0]
           );
-          await pool.query('INSERT IGNORE INTO inventory (product_id, current_qty) VALUES (?, 0)', [p.id]);
+          await pool.query('INSERT IGNORE INTO inventory (product_id, current_qty) VALUES (?, 0)', [id]);
         }
         return { code: 200, message: 'Success' };
       }
@@ -118,12 +122,13 @@ exports.main = async (event, context) => {
         return { code: 200, data: rows.map(r => ({ ...r, bankAccount: r.bank_account })) };
       }
       case 'createSupplier': {
-        const { id, name, contact, phone, address, bankAccount, remark } = payload;
+        const { name, contact, phone, address, bankAccount, remark } = payload;
+        const id = payload.id || crypto.randomUUID();
         await pool.query(
           'INSERT INTO suppliers (id, name, contact, phone, address, bank_account, remark) VALUES (?, ?, ?, ?, ?, ?, ?)',
           [id, name, contact, phone, address, bankAccount || '', remark || '']
         );
-        return { code: 200, message: 'Success' };
+        return { code: 200, message: 'Success', data: { id } };
       }
       case 'updateSupplier': {
         const { id, ...rest } = payload;
@@ -147,12 +152,13 @@ exports.main = async (event, context) => {
         return { code: 200, data: rows.map(r => ({ ...r, creditLimit: r.credit_limit ? parseFloat(r.credit_limit) : 0 })) };
       }
       case 'createCustomer': {
-        const { id, name, contact, phone, address, level, creditLimit, remark } = payload;
+        const { name, contact, phone, address, level, creditLimit, remark } = payload;
+        const id = payload.id || crypto.randomUUID();
         await pool.query(
           'INSERT INTO customers (id, name, contact, phone, address, level, credit_limit, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
           [id, name, contact, phone, address, level, creditLimit || 0, remark || '']
         );
-        return { code: 200, message: 'Success' };
+        return { code: 200, message: 'Success', data: { id } };
       }
       case 'updateCustomer': {
         const { id, ...rest } = payload;
@@ -184,7 +190,8 @@ exports.main = async (event, context) => {
         return { code: 200, data: orders };
       }
       case 'createPurchaseOrder': {
-        const { id, supplierId, orderDate, totalAmount, status, remark, items } = payload;
+        const { supplierId, orderDate, totalAmount, status, remark, items } = payload;
+        const id = payload.id || crypto.randomUUID();
         const orderNo = 'PO' + Date.now();
         await pool.query(
           'INSERT INTO purchase_orders (id, order_no, supplier_id, order_date, total_amount, status, remark) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -194,11 +201,11 @@ exports.main = async (event, context) => {
           for (const item of items) {
             await pool.query(
               'INSERT INTO purchase_items (id, order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?, ?)',
-              [Math.random().toString(36).substr(2, 9), id, item.productId, item.quantity, item.unitPrice, item.quantity * item.unitPrice]
+              [crypto.randomUUID(), id, item.productId, item.quantity, item.unitPrice, item.quantity * item.unitPrice]
             );
           }
         }
-        return { code: 200, message: 'Success' };
+        return { code: 200, message: 'Success', data: { id } };
       }
       case 'deletePurchaseOrder': {
         await pool.query('DELETE FROM purchase_items WHERE order_id = ?', [payload.id]);
@@ -246,7 +253,7 @@ exports.main = async (event, context) => {
             }
             
             // Insert log
-            const logId = Math.random().toString(36).substring(2, 11);
+            const logId = crypto.randomUUID();
             await connection.query(
               'INSERT INTO inventory_logs (id, product_id, type, quantity_change, balance, ref_type, ref_id, operator, _openid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
               [logId, product_id, 'in', quantity, newQty, 'purchase', id, operator || 'system', event.userInfo?.openId || '']
@@ -278,7 +285,8 @@ exports.main = async (event, context) => {
         return { code: 200, data: orders };
       }
       case 'createSalesOrder': {
-        const { id, customerId, orderDate, totalAmount, discount, status, paymentStatus, remark, items } = payload;
+        const { customerId, orderDate, totalAmount, discount, status, paymentStatus, remark, items } = payload;
+        const id = payload.id || crypto.randomUUID();
         const orderNo = 'SO' + Date.now();
         await pool.query(
           'INSERT INTO sales_orders (id, order_no, customer_id, order_date, total_amount, discount, status, payment_status, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -288,11 +296,11 @@ exports.main = async (event, context) => {
           for (const item of items) {
             await pool.query(
               'INSERT INTO sales_items (id, order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?, ?)',
-              [Math.random().toString(36).substr(2, 9), id, item.productId, item.quantity, item.unitPrice, item.quantity * item.unitPrice]
+              [crypto.randomUUID(), id, item.productId, item.quantity, item.unitPrice, item.quantity * item.unitPrice]
             );
           }
         }
-        return { code: 200, message: 'Success' };
+        return { code: 200, message: 'Success', data: { id } };
       }
       case 'deleteSalesOrder': {
         await pool.query('DELETE FROM sales_items WHERE order_id = ?', [payload.id]);
@@ -347,7 +355,7 @@ exports.main = async (event, context) => {
             const [invRows] = await connection.query('SELECT current_qty FROM inventory WHERE product_id = ?', [product_id]);
             const newQty = invRows[0].current_qty;
             
-            const logId = Math.random().toString(36).substring(2, 11);
+            const logId = crypto.randomUUID();
             await connection.query(
               'INSERT INTO inventory_logs (id, product_id, type, quantity_change, balance, ref_type, ref_id, operator, _openid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
               [logId, product_id, 'out', quantity, newQty, 'sales', id, operator || 'system', event.userInfo?.openId || '']
@@ -425,7 +433,7 @@ exports.main = async (event, context) => {
           
           await connection.query('UPDATE inventory SET current_qty = ? WHERE product_id = ?', [newQty, productId]);
           
-          const logId = Math.random().toString(36).substring(2, 11);
+          const logId = crypto.randomUUID();
           await connection.query(
             'INSERT INTO inventory_logs (id, product_id, type, quantity_change, balance, ref_type, ref_id, operator, _openid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [logId, productId, 'adjust', diff, newQty, 'adjust', 'manual', operator || 'system', event.userInfo?.openId || '']

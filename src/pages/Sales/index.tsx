@@ -13,7 +13,6 @@ import {
 } from '@ant-design/icons';
 import { salesOrderDB, customerDB, productDB, inventoryDB } from '../../database/db';
 import type { SalesOrder, SalesItem, Customer, Product, InventoryRecord } from '../../database/types';
-import { generateId } from '../../database/db';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 dayjs.extend(isBetween);
@@ -75,7 +74,7 @@ const SalesPage: React.FC = () => {
   };
 
   const addItem = () => {
-    setItems([...items, { id: generateId(), productId: '', quantity: 1, unitPrice: 0, subtotal: 0 }]);
+    setItems([...items, { id: Math.random().toString(36).substr(2, 9), productId: '', quantity: 1, unitPrice: 0, subtotal: 0 }]);
   };
 
   const updateItem = (idx: number, field: string, value: unknown) => {

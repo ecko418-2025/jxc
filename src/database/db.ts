@@ -49,8 +49,7 @@ async function callApi(action: string, payload: any = {}): Promise<any> {
   }
 }
 
-// 帮助函数：在前端生成 UUID (如果不放在后端生成的话)
-export const generateId = () => Math.random().toString(36).substr(2, 9);
+
 
 // ========================
 // Categories
@@ -61,7 +60,7 @@ export const categoryDB = {
     return res.data || [];
   },
   async create(data: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
-    await callApi('createCategory', { ...data, id: generateId() });
+    await callApi('createCategory', { ...data });
   },
   async update(id: string, data: Partial<Category>): Promise<void> {
     await callApi('updateCategory', { ...data, id });
@@ -80,7 +79,7 @@ export const productDB = {
     return res.data || [];
   },
   async create(data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
-    await callApi('createProduct', { ...data, id: generateId() });
+    await callApi('createProduct', { ...data });
   },
   async update(id: string, data: Partial<Product>): Promise<void> {
     await callApi('updateProduct', { ...data, id });
@@ -89,7 +88,7 @@ export const productDB = {
     await callApi('deleteProduct', { id });
   },
   async bulkCreate(itemsData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>[]): Promise<void> {
-    const payload = itemsData.map(item => ({ ...item, id: generateId() }));
+    const payload = itemsData;
     await callApi('bulkCreateProducts', { products: payload });
   },
 };
@@ -103,7 +102,7 @@ export const supplierDB = {
     return res.data || [];
   },
   async create(data: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
-    await callApi('createSupplier', { ...data, id: generateId() });
+    await callApi('createSupplier', { ...data });
   },
   async update(id: string, data: Partial<Supplier>): Promise<void> {
     await callApi('updateSupplier', { ...data, id });
@@ -119,7 +118,7 @@ export const customerDB = {
     return res.data || [];
   },
   async create(data: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
-    await callApi('createCustomer', { ...data, id: generateId() });
+    await callApi('createCustomer', { ...data });
   },
   async update(id: string, data: Partial<Customer>): Promise<void> {
     await callApi('updateCustomer', { ...data, id });
@@ -138,7 +137,7 @@ export const purchaseOrderDB = {
     return res.data || [];
   },
   async create(data: Omit<PurchaseOrder, 'id' | 'orderNo' | 'createdAt' | 'updatedAt'>): Promise<void> {
-    await callApi('createPurchaseOrder', { ...data, id: generateId() });
+    await callApi('createPurchaseOrder', { ...data });
   },
   async update(id: string, data: Partial<PurchaseOrder>): Promise<void> {
     await callApi('updatePurchaseOrder', { ...data, id });
@@ -160,7 +159,7 @@ export const salesOrderDB = {
     return res.data || [];
   },
   async create(data: Omit<SalesOrder, 'id' | 'orderNo' | 'createdAt' | 'updatedAt'>): Promise<void> {
-    await callApi('createSalesOrder', { ...data, id: generateId() });
+    await callApi('createSalesOrder', { ...data });
   },
   async update(id: string, data: Partial<SalesOrder>): Promise<void> {
     await callApi('updateSalesOrder', { ...data, id });
