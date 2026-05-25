@@ -97,7 +97,7 @@ const SuppliersPage: React.FC = () => {
             title: '供应商名称', 
             dataIndex: 'name', 
             width: 200, 
-            render: (v: string, record: Supplier) => (
+            render: (v: string) => (
               <a onClick={() => navigate(`/purchase?search=${encodeURIComponent(v)}`)}>
                 <Text strong style={{ color: '#6366f1' }}>{v}</Text>
               </a>

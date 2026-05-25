@@ -127,7 +127,7 @@ const CustomersPage: React.FC = () => {
             title: '酒店名称',
             dataIndex: 'name',
             width: 200,
-            render: (v: string, record: Customer) => (
+            render: (v: string) => (
               <a onClick={() => navigate(`/sales?search=${encodeURIComponent(v)}`)}>
                 <Text strong style={{ color: '#6366f1' }}>{v}</Text>
               </a>

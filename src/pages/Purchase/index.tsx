@@ -162,7 +162,7 @@ const PurchasePage: React.FC = () => {
   // Receive / enter stock
   const handleReceive = async (id: string) => {
     try {
-      await purchaseOrderDB.confirmReceipt(id);
+      await purchaseOrderDB.confirmReceipt(id, '系统');
       message.success('已入库，库存已更新');
       refreshData();
     } catch (error: any) {
