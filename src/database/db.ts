@@ -145,9 +145,13 @@ export const purchaseOrderDB = {
   async delete(id: string): Promise<void> {
     await callApi('deletePurchaseOrder', { id });
   },
-  async confirmReceipt(id: string): Promise<void> {
-    await callApi('confirmPurchaseReceipt', { id, operator: '系统' });
+  async confirmReceipt(id: string, operator: string): Promise<void> {
+    await callApi('confirmPurchaseReceipt', { id, operator });
   },
+  async getLogs(orderId: string): Promise<any[]> {
+    const res = await callApi('getOrderLogs', { orderId });
+    return res.data || [];
+  }
 };
 
 // ========================
@@ -167,9 +171,13 @@ export const salesOrderDB = {
   async delete(id: string): Promise<void> {
     await callApi('deleteSalesOrder', { id });
   },
-  async confirmShipment(id: string): Promise<void> {
-    await callApi('confirmSalesShipment', { id, operator: '系统' });
+  async confirmShipment(id: string, operator: string): Promise<void> {
+    await callApi('confirmSalesShipment', { id, operator });
   },
+  async getLogs(orderId: string): Promise<any[]> {
+    const res = await callApi('getOrderLogs', { orderId });
+    return res.data || [];
+  }
 };
 
 // ========================

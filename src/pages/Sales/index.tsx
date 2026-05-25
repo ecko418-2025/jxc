@@ -5,12 +5,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber, Select, Space, Tag,
-  Card, message, DatePicker, Popconfirm, Typography, Row, Col, Divider
+  Card, message, DatePicker, Popconfirm, Typography, Row, Col, Divider, Drawer, Timeline
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, CheckOutlined, SendOutlined,
   EyeOutlined, DollarOutlined,
 } from '@ant-design/icons';
+import { useSearchParams } from 'react-router-dom';
 import { salesOrderDB, customerDB, productDB, inventoryDB } from '../../database/db';
 import type { SalesOrder, SalesItem, Customer, Product, InventoryRecord } from '../../database/types';
 import dayjs from 'dayjs';
@@ -32,8 +33,28 @@ const SalesPage: React.FC = () => {
   const [form] = Form.useForm();
   const [items, setItems] = useState<SalesItem[]>([]);
 
-  const [searchText, setSearchText] = useState('');
+  const [searchParams] = useSearchParams();
+  const [searchText, setSearchText] = useState(searchParams.get('search') || '');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
+
+  const [timelineVisible, setTimelineVisible] = useState(false);
+  const [timelineLogs, setTimelineLogs] = useState<any[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [currentTimelineOrder, setCurrentTimelineOrder] = useState<string>('');
+
+  const handleShowTimeline = async (order: SalesOrder) => {
+    setCurrentTimelineOrder(order.orderNo);
+    setTimelineVisible(true);
+    setTimelineLoading(true);
+    try {
+      const logs = await salesOrderDB.getLogs(order.id);
+      setTimelineLogs(logs);
+    } catch (e) {
+      message.error('获取日志失败');
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
 
   const refreshData = useCallback(async () => {
     try {
@@ -102,7 +123,7 @@ const SalesPage: React.FC = () => {
 
       await salesOrderDB.create({
         customerId: values.customerId,
-        orderDate: values.orderDate.format('YYYY-MM-DD'),
+        orderDate: values.orderDate.format('YYYY-MM-DD HH:mm:ss'),
         totalAmount: totalAmount - (values.discount || 0),
         discount: values.discount || 0,
         status: 'draft',
@@ -133,11 +154,19 @@ const SalesPage: React.FC = () => {
 
   const handleShip = async (id: string) => {
     try {
-      await salesOrderDB.confirmShipment(id);
+      await salesOrderDB.confirmShipment(id, '系统');
       message.success('已发货，库存已扣减');
       refreshData();
     } catch (error: any) {
-      message.error('发货失败: ' + (error.message || '库存不足'));
+      const errorMsg = error.message || '库存不足';
+      if (errorMsg.includes('库存不足')) {
+        Modal.error({
+          title: '发货失败',
+          content: <div style={{ whiteSpace: 'pre-line' }}>{errorMsg}</div>,
+        });
+      } else {
+        message.error('发货失败: ' + errorMsg);
+      }
     }
   };
 
@@ -182,7 +211,7 @@ const SalesPage: React.FC = () => {
       dataIndex: 'orderNo',
       width: 160,
       sorter: (a: any, b: any) => a.orderNo.localeCompare(b.orderNo),
-      render: (no: string) => <Text style={{ fontFamily: 'monospace', color: 'var(--text-accent)' }}>{no}</Text>,
+      render: (no: string, record: SalesOrder) => <a onClick={() => handleShowTimeline(record)} style={{ fontFamily: 'monospace', color: 'var(--primary-color)' }}>{no}</a>,
     },
     {
       title: '客户',
@@ -198,8 +227,9 @@ const SalesPage: React.FC = () => {
     { 
       title: '日期', 
       dataIndex: 'orderDate', 
-      width: 110,
+      width: 170,
       sorter: (a: any, b: any) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime(),
+      render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
       title: '金额',
@@ -279,11 +309,12 @@ const SalesPage: React.FC = () => {
             allowClear 
           />
           <Input.Search
-            placeholder="搜索单号/客户"
+            placeholder="搜索单号/客户名称"
             allowClear
-            style={{ width: 200 }}
+            style={{ width: 250 }}
+            value={searchText}
             onSearch={setSearchText}
-            onChange={e => !e.target.value && setSearchText('')}
+            onChange={e => setSearchText(e.target.value)}
           />
         </Space>
       </Space>
@@ -332,7 +363,7 @@ const SalesPage: React.FC = () => {
             </Col>
             <Col span={8}>
               <Form.Item name="orderDate" label="销售日期" rules={[{ required: true }]}>
-                <DatePicker style={{ width: '100%' }} />
+                <DatePicker showTime style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={4}>
@@ -360,28 +391,48 @@ const SalesPage: React.FC = () => {
               title: '产品',
               dataIndex: 'productId',
               width: 200,
-              render: (v: string, _: unknown, idx: number) => (
-                <Select
-                  value={v || undefined}
-                  placeholder="选择产品"
-                  style={{ width: '100%' }}
-                  onChange={(val) => updateItem(idx, 'productId', val)}
-                  showSearch
-                  filterOption={(input, option) =>
-                    (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase())
-                  }
-                >
-                  {products.map(p => {
-                    const inv = inventories.find(i => i.productId === p.id) as any;
-                    const qty = inv?.quantity ?? inv?.currentQty ?? 0;
-                    return (
-                      <Select.Option key={p.id} value={p.id}>
-                        {p.name} (库存:{qty})
-                      </Select.Option>
-                    );
-                  })}
-                </Select>
-              ),
+              render: (v: string, _: unknown, idx: number) => {
+                const sortedProducts = [...products].sort((a, b) => {
+                  const invA = inventories.find(i => i.productId === a.id) as any;
+                  const qtyA = invA?.quantity ?? invA?.currentQty ?? 0;
+                  const isLowA = qtyA <= a.minStock;
+
+                  const invB = inventories.find(i => i.productId === b.id) as any;
+                  const qtyB = invB?.quantity ?? invB?.currentQty ?? 0;
+                  const isLowB = qtyB <= b.minStock;
+
+                  if (isLowA && !isLowB) return -1;
+                  if (!isLowA && isLowB) return 1;
+                  return a.name.localeCompare(b.name);
+                });
+
+                return (
+                  <Select
+                    value={v || undefined}
+                    placeholder="选择产品"
+                    style={{ width: '100%' }}
+                    onChange={(val) => updateItem(idx, 'productId', val)}
+                    showSearch
+                    optionFilterProp="title"
+                  >
+                    {sortedProducts.map(p => {
+                      const inv = inventories.find(i => i.productId === p.id) as any;
+                      const qty = inv?.quantity ?? inv?.currentQty ?? 0;
+                      const isLowStock = qty <= p.minStock;
+                      const titleText = `${p.name} (${p.sku}) (库存:${qty})`;
+                      
+                      return (
+                        <Select.Option key={p.id} value={p.id} title={titleText}>
+                          <div style={{ color: isLowStock ? '#ef4444' : 'inherit', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>{titleText}</span>
+                            {isLowStock && <span style={{ fontSize: '0.85em', color: '#ef4444' }}>库存预警</span>}
+                          </div>
+                        </Select.Option>
+                      );
+                    })}
+                  </Select>
+                );
+              },
             },
             {
               title: '数量',
@@ -457,6 +508,39 @@ const SalesPage: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      <Drawer
+        title={`订单动态: ${currentTimelineOrder}`}
+        placement="right"
+        onClose={() => setTimelineVisible(false)}
+        open={timelineVisible}
+        width={400}
+      >
+        <Timeline
+          pending={timelineLoading ? '加载中...' : false}
+          items={timelineLogs.map(log => ({
+            color: log.action === 'create' ? 'green' : 'blue',
+            children: (
+              <>
+                <div style={{ marginBottom: 4 }}>
+                  <Text strong>{log.detail}</Text>
+                </div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                  <Space>
+                    <span>{log.operator}</span>
+                    <span>{dayjs(log.created_at).format('YYYY-MM-DD HH:mm:ss')}</span>
+                  </Space>
+                </div>
+              </>
+            )
+          }))}
+        />
+        {!timelineLoading && timelineLogs.length === 0 && (
+          <div style={{ textAlign: 'center', marginTop: 40, color: 'var(--text-secondary)' }}>
+            暂无历史动态
+          </div>
+        )}
+      </Drawer>
     </Card>
   );
 };

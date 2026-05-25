@@ -5,6 +5,23 @@ const crypto = require('crypto');
 // 数据库连接池
 let pool;
 
+const orderStatusMap = {
+  draft: '草稿',
+  pending: '待处理',
+  confirmed: '已确认',
+  shipped: '已发货',
+  received: '已入库',
+  completed: '已完成',
+  cancelled: '已取消'
+};
+
+const paymentStatusMap = {
+  unpaid: '未付款',
+  partial: '部分付款',
+  paid: '已付款',
+  refunded: '已退款'
+};
+
 exports.main = async (event, context) => {
   // 1. 初始化数据库连接池 (如果在热启动期间已有连接池，则复用)
   if (!pool) {
@@ -18,7 +35,9 @@ exports.main = async (event, context) => {
       database: process.env.DB_NAME || 'hotel_inventory',
       waitForConnections: true,
       connectionLimit: 10,
-      queueLimit: 0
+      queueLimit: 0,
+      timezone: '+08:00',
+      dateStrings: true
     });
   }
 
@@ -205,6 +224,7 @@ exports.main = async (event, context) => {
             );
           }
         }
+        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'create', '创建了采购单', payload.operator || '系统']);
         return { code: 200, message: 'Success', data: { id } };
       }
       case 'deletePurchaseOrder': {
@@ -215,6 +235,7 @@ exports.main = async (event, context) => {
       case 'updatePurchaseOrder': {
         if (payload.status) {
           await pool.query('UPDATE purchase_orders SET status = ? WHERE id = ?', [payload.status, payload.id]);
+          await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), payload.id, 'purchase', 'update_status', `更新了采购单状态为: ${orderStatusMap[payload.status] || payload.status}`, payload.operator || '系统']);
         }
         return { code: 200, message: 'Success' };
       }
@@ -256,10 +277,11 @@ exports.main = async (event, context) => {
             const logId = crypto.randomUUID();
             await connection.query(
               'INSERT INTO inventory_logs (id, product_id, type, quantity_change, balance, ref_type, ref_id, operator, _openid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [logId, product_id, 'in', quantity, newQty, 'purchase', id, operator || 'system', event.userInfo?.openId || '']
+              [logId, product_id, 'in', quantity, newQty, 'purchase', id, operator || '系统', event.userInfo?.openId || '']
             );
           }
           
+          await connection.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'update_status', '确认入库 (更新订单状态为: 已入库)', operator || '系统']);
           await connection.commit();
           return { code: 200, message: 'Success' };
         } catch (e) {
@@ -300,6 +322,7 @@ exports.main = async (event, context) => {
             );
           }
         }
+        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'create', '创建了销售单', payload.operator || '系统']);
         return { code: 200, message: 'Success', data: { id } };
       }
       case 'deleteSalesOrder': {
@@ -322,6 +345,12 @@ exports.main = async (event, context) => {
         if (updates.length > 0) {
           params.push(id);
           await pool.query(`UPDATE sales_orders SET ${updates.join(', ')} WHERE id = ?`, params);
+          if (status) {
+            await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_status', `更新了订单状态为: ${orderStatusMap[status] || status}`, payload.operator || '系统']);
+          }
+          if (paymentStatus) {
+            await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_payment', `更新了收款状态为: ${paymentStatusMap[paymentStatus] || paymentStatus}`, payload.operator || '系统']);
+          }
         }
         return { code: 200, message: 'Success' };
       }
@@ -339,12 +368,18 @@ exports.main = async (event, context) => {
           const [items] = await connection.query('SELECT product_id, quantity FROM sales_items WHERE order_id = ?', [id]);
           
           // Verify inventory
+          let insufficientItems = [];
           for (const item of items) {
             const [invRows] = await connection.query('SELECT current_qty FROM inventory WHERE product_id = ? FOR UPDATE', [item.product_id]);
             const currentQty = invRows.length > 0 ? invRows[0].current_qty : 0;
             if (currentQty < item.quantity) {
-              throw new Error(`Insufficient stock for product ID: ${item.product_id}`);
+              const [prodRows] = await connection.query('SELECT name FROM products WHERE id = ?', [item.product_id]);
+              const prodName = prodRows.length > 0 ? prodRows[0].name : item.product_id;
+              insufficientItems.push(`- ${prodName} (需要: ${item.quantity}, 当前库存: ${currentQty})`);
             }
+          }
+          if (insufficientItems.length > 0) {
+            throw new Error(`以下商品库存不足，无法发货:\n${insufficientItems.join('\n')}`);
           }
           
           await connection.query('UPDATE sales_orders SET status = ? WHERE id = ?', ['shipped', id]);
@@ -358,10 +393,11 @@ exports.main = async (event, context) => {
             const logId = crypto.randomUUID();
             await connection.query(
               'INSERT INTO inventory_logs (id, product_id, type, quantity_change, balance, ref_type, ref_id, operator, _openid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [logId, product_id, 'out', quantity, newQty, 'sales', id, operator || 'system', event.userInfo?.openId || '']
+              [logId, product_id, 'out', quantity, newQty, 'sales', id, operator || '系统', event.userInfo?.openId || '']
             );
           }
           
+          await connection.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_status', '确认出库 (更新订单状态为: 已发货)', operator || '系统']);
           await connection.commit();
           return { code: 200, message: 'Success' };
         } catch (e) {
@@ -382,7 +418,7 @@ exports.main = async (event, context) => {
           SELECT p.*, i.current_qty 
           FROM products p 
           LEFT JOIN inventory i ON p.id = i.product_id 
-          WHERE i.current_qty <= p.min_stock
+          WHERE i.current_qty <= p.min_stock AND p.active = 1
         `);
         const result = rows.map(r => ({
           product: { id: r.id, sku: r.sku, name: r.name, minStock: r.min_stock },
@@ -396,19 +432,36 @@ exports.main = async (event, context) => {
       }
       case 'getInventoryLogsByProduct': {
         const { productId } = payload;
-        const [rows] = await pool.query('SELECT * FROM inventory_logs WHERE product_id = ? ORDER BY created_at DESC LIMIT 100', [productId]);
+        const [rows] = await pool.query(`
+          SELECT l.*, 
+                 po.order_no as po_no, 
+                 so.order_no as so_no 
+          FROM inventory_logs l
+          LEFT JOIN purchase_orders po ON l.ref_type = 'purchase' AND l.ref_id = po.id
+          LEFT JOIN sales_orders so ON l.ref_type = 'sales' AND l.ref_id = so.id
+          WHERE l.product_id = ? 
+          ORDER BY l.created_at DESC 
+          LIMIT 100
+        `, [productId]);
         return { 
           code: 200, 
-          data: rows.map(r => ({ 
-            id: r.id,
-            productId: r.product_id, 
-            type: r.type,
-            quantity: r.quantity_change,
-            balance: r.balance,
-            operator: r.operator,
-            createdAt: r.created_at,
-            remark: r.ref_type === 'adjust' ? '人工调整' : (r.ref_type === 'purchase' ? '采购入库' : '销售出库')
-          })) 
+          data: rows.map(r => {
+            let remark = '';
+            if (r.ref_type === 'adjust') remark = '人工调整';
+            else if (r.ref_type === 'purchase') remark = r.po_no ? `采购入库 (${r.po_no})` : '采购入库';
+            else if (r.ref_type === 'sales') remark = r.so_no ? `销售出库 (${r.so_no})` : '销售出库';
+
+            return {
+              id: r.id,
+              productId: r.product_id, 
+              type: r.type,
+              quantity: r.quantity_change,
+              balance: r.balance,
+              operator: r.operator,
+              createdAt: r.created_at,
+              remark
+            };
+          }) 
         };
       }
       case 'adjustInventoryStock': {
@@ -436,7 +489,7 @@ exports.main = async (event, context) => {
           const logId = crypto.randomUUID();
           await connection.query(
             'INSERT INTO inventory_logs (id, product_id, type, quantity_change, balance, ref_type, ref_id, operator, _openid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [logId, productId, 'adjust', diff, newQty, 'adjust', 'manual', operator || 'system', event.userInfo?.openId || '']
+            [logId, productId, 'adjust', diff, newQty, 'adjust', 'manual', operator || '系统', event.userInfo?.openId || '']
           );
           
           await connection.commit();
@@ -447,6 +500,12 @@ exports.main = async (event, context) => {
         } finally {
           connection.release();
         }
+      }
+
+      case 'getOrderLogs': {
+        const { orderId } = payload;
+        const [logs] = await pool.query('SELECT * FROM order_logs WHERE order_id = ? ORDER BY created_at DESC', [orderId]);
+        return { code: 200, data: logs };
       }
 
       default:

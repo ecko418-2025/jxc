@@ -8,12 +8,14 @@ import {
   Popconfirm, Typography, Tooltip,
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, PhoneOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { supplierDB } from '../../database/db';
 import type { Supplier } from '../../database/types';
 
 const { Text } = Typography;
 
 const SuppliersPage: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -91,7 +93,16 @@ const SuppliersPage: React.FC = () => {
         size="small"
         pagination={{ defaultPageSize: 15, showSizeChanger: true }}
         columns={[
-          { title: '供应商名称', dataIndex: 'name', width: 200, render: (v: string) => <Text strong>{v}</Text> },
+          { 
+            title: '供应商名称', 
+            dataIndex: 'name', 
+            width: 200, 
+            render: (v: string, record: Supplier) => (
+              <a onClick={() => navigate(`/purchase?search=${encodeURIComponent(v)}`)}>
+                <Text strong style={{ color: '#6366f1' }}>{v}</Text>
+              </a>
+            ) 
+          },
           { title: '联系人', dataIndex: 'contact', width: 100 },
           {
             title: '电话',

@@ -128,6 +128,7 @@ const ProductsPage: React.FC = () => {
   const handleSaveCategory = async () => {
     try {
       const values = await categoryForm.validateFields();
+      values.parentId = values.parentId || null; // Explicitly set to null to clear it
       if (editingCategory) {
         await categoryDB.update(editingCategory.id, values);
         message.success('品类已更新');

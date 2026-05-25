@@ -8,6 +8,7 @@ import {
   Popconfirm, Typography, Tooltip,
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, PhoneOutlined, CrownOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { customerDB } from '../../database/db';
 import type { Customer } from '../../database/types';
 
@@ -21,6 +22,7 @@ const levelColors: Record<string, string> = {
 };
 
 const CustomersPage: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchText, setSearchText] = useState('');
@@ -125,7 +127,11 @@ const CustomersPage: React.FC = () => {
             title: '酒店名称',
             dataIndex: 'name',
             width: 200,
-            render: (v: string) => <Text strong>{v}</Text>,
+            render: (v: string, record: Customer) => (
+              <a onClick={() => navigate(`/sales?search=${encodeURIComponent(v)}`)}>
+                <Text strong style={{ color: '#6366f1' }}>{v}</Text>
+              </a>
+            ),
           },
           {
             title: '等级',

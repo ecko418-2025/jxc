@@ -301,8 +301,8 @@ const InventoryPage: React.FC = () => {
             {
               title: '时间',
               dataIndex: 'createdAt',
-              width: 160,
-              render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm'),
+              width: 170,
+              render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm:ss'),
             },
             {
               title: '类型',
