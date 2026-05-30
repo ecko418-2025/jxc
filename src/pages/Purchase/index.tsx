@@ -30,7 +30,9 @@ const PurchasePage: React.FC = () => {
   
   const [modalOpen, setModalOpen] = useState(false);
   const [detailOrder, setDetailOrder] = useState<PurchaseOrder | null>(null);
+  const [editingInfo, setEditingInfo] = useState(false);
   const [form] = Form.useForm();
+  const [infoForm] = Form.useForm();
   const [items, setItems] = useState<PurchaseItem[]>([]);
 
   const [searchParams] = useSearchParams();
@@ -133,6 +135,7 @@ const PurchasePage: React.FC = () => {
         orderDate: values.orderDate.format('YYYY-MM-DD HH:mm:ss'),
         totalAmount,
         status: 'draft',
+        extOrderNo: values.extOrderNo || '',
         remark: values.remark || '',
         items,
       });
@@ -156,6 +159,20 @@ const PurchasePage: React.FC = () => {
       refreshData();
     } catch (error: any) {
       message.error('确认失败: ' + (error.message || ''));
+    }
+  };
+
+  const handleUpdateInfo = async () => {
+    if (!detailOrder) return;
+    try {
+      const values = await infoForm.validateFields();
+      await purchaseOrderDB.updateInfo(detailOrder.id, values.extOrderNo || '', values.remark || '', '系统');
+      message.success('订单信息已更新');
+      setEditingInfo(false);
+      setDetailOrder({ ...detailOrder, extOrderNo: values.extOrderNo, remark: values.remark });
+      refreshData();
+    } catch (error: any) {
+      message.error('更新失败: ' + (error.message || ''));
     }
   };
 
@@ -217,6 +234,12 @@ const PurchasePage: React.FC = () => {
       width: 120,
       sorter: (a: any, b: any) => Number(a.totalAmount) - Number(b.totalAmount),
       render: (v: number) => <Text strong style={{ color: '#f59e0b' }}>¥{Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>,
+    },
+    {
+      title: '对方单号',
+      dataIndex: 'extOrderNo',
+      width: 120,
+      render: (text: string) => <Text type="secondary">{text || '—'}</Text>,
     },
     {
       title: '备注',
@@ -338,6 +361,11 @@ const PurchasePage: React.FC = () => {
               </Form.Item>
             </Col>
             <Col span={8}>
+              <Form.Item name="extOrderNo" label="对方单号(可选)">
+                <Input placeholder="对方核对流转的单号" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
               <Form.Item name="remark" label="备注">
                 <Input placeholder="备注" />
               </Form.Item>
@@ -443,7 +471,7 @@ const PurchasePage: React.FC = () => {
       <Modal
         title={`采购单详情 - ${detailOrder?.orderNo}`}
         open={!!detailOrder}
-        onCancel={() => setDetailOrder(null)}
+        onCancel={() => { setDetailOrder(null); setEditingInfo(false); }}
         footer={null}
         width={700}
       >
@@ -469,7 +497,45 @@ const PurchasePage: React.FC = () => {
             <div style={{ textAlign: 'right', marginTop: 12 }}>
               <Text strong style={{ fontSize: 16 }}>合计: ¥{Number(detailOrder.totalAmount).toFixed(2)}</Text>
             </div>
-            {detailOrder.remark && <div style={{ marginTop: 8 }}><Text type="secondary">备注: {detailOrder.remark}</Text></div>}
+            
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text strong>附加信息</Text>
+                {!editingInfo ? (
+                  <Button size="small" type="link" onClick={() => {
+                    infoForm.setFieldsValue({ extOrderNo: detailOrder.extOrderNo, remark: detailOrder.remark });
+                    setEditingInfo(true);
+                  }}>修改信息</Button>
+                ) : (
+                  <Space>
+                    <Button size="small" onClick={() => setEditingInfo(false)}>取消</Button>
+                    <Button size="small" type="primary" onClick={handleUpdateInfo}>保存</Button>
+                  </Space>
+                )}
+              </div>
+              
+              {!editingInfo ? (
+                <>
+                  <div style={{ marginBottom: 4 }}><Text type="secondary">对方单号: </Text><Text>{detailOrder.extOrderNo || '—'}</Text></div>
+                  <div><Text type="secondary">备注: </Text><Text>{detailOrder.remark || '—'}</Text></div>
+                </>
+              ) : (
+                <Form form={infoForm} layout="vertical">
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item name="extOrderNo" label="对方单号" style={{ marginBottom: 0 }}>
+                        <Input placeholder="对方核对流转的单号" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item name="remark" label="备注" style={{ marginBottom: 0 }}>
+                        <Input placeholder="备注信息" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Form>
+              )}
+            </div>
           </div>
         )}
       </Modal>

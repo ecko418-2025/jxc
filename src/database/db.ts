@@ -142,6 +142,9 @@ export const purchaseOrderDB = {
   async update(id: string, data: Partial<PurchaseOrder>): Promise<void> {
     await callApi('updatePurchaseOrder', { ...data, id });
   },
+  async updateInfo(id: string, extOrderNo: string, remark: string, operator: string): Promise<void> {
+    await callApi('updatePurchaseOrderInfo', { id, extOrderNo, remark, operator });
+  },
   async delete(id: string): Promise<void> {
     await callApi('deletePurchaseOrder', { id });
   },
@@ -167,6 +170,9 @@ export const salesOrderDB = {
   },
   async update(id: string, data: Partial<SalesOrder>): Promise<void> {
     await callApi('updateSalesOrder', { ...data, id });
+  },
+  async updateInfo(id: string, extOrderNo: string, remark: string, operator: string): Promise<void> {
+    await callApi('updateSalesOrderInfo', { id, extOrderNo, remark, operator });
   },
   async delete(id: string): Promise<void> {
     await callApi('deleteSalesOrder', { id });

@@ -21,6 +21,7 @@ import {
   importCategories, importProducts,
   exportProducts, exportCategories,
 } from '../../utils/excel';
+import ProductHistoryModal from '../../components/ProductHistoryModal';
 
 const { Search } = Input;
 const { Text } = Typography;
@@ -42,6 +43,8 @@ const ProductsPage: React.FC = () => {
   const [productForm] = Form.useForm();
   const [categoryForm] = Form.useForm();
   const [activeTab, setActiveTab] = useState('products');
+  const [logModalOpen, setLogModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const refreshData = useCallback(async () => {
     try {
@@ -209,7 +212,11 @@ const ProductsPage: React.FC = () => {
       dataIndex: 'sku',
       width: 100,
       sorter: (a: Product, b: Product) => a.sku.localeCompare(b.sku),
-      render: (sku: string) => <Text style={{ color: 'var(--text-accent)', fontFamily: 'monospace' }}>{sku}</Text>,
+      render: (sku: string, record: Product) => (
+        <a onClick={() => { setSelectedProduct(record); setLogModalOpen(true); }} style={{ color: 'var(--primary-color)', fontFamily: 'monospace' }}>
+          {sku}
+        </a>
+      ),
     },
     {
       title: '产品名称',
@@ -649,6 +656,13 @@ const ProductsPage: React.FC = () => {
           </Upload.Dragger>
         </div>
       </Modal>
+
+      <ProductHistoryModal
+        open={logModalOpen}
+        productId={selectedProduct?.id || ''}
+        productName={selectedProduct?.name || ''}
+        onClose={() => setLogModalOpen(false)}
+      />
     </div>
   );
 };

@@ -25,7 +25,7 @@
 
 - **版本**：v1.0.0
 - **运行方式**：本地 Web 应用（Vite 开发服务器）
-- **数据存储**：腾讯云开发 (CloudBase) 数据库 + 内存同步缓存
+- **数据存储**：腾讯云开发 (CloudBase) MySQL 数据库 + 云函数 (Node.js)
 
 ---
 
@@ -41,7 +41,7 @@
 | 路由 | react-router-dom | 7.x | 单页应用路由 |
 | 日期处理 | dayjs | — | 日期格式化 |
 | Excel 读写 | SheetJS (xlsx) | — | Excel 导入导出 |
-| 数据存储 | LocalStorage | — | 浏览器本地存储 |
+| 数据存储 | CloudBase MySQL | — | 后端关系型数据库 |
 
 ### 设计风格
 
@@ -69,8 +69,8 @@ hotel-inventory/
     │
     ├── database/                 # 数据层
     │   ├── types.ts              # 所有数据模型的 TypeScript 类型定义
-    │   ├── db.ts                 # LocalStorage CRUD 操作封装
-    │   └── seed.ts               # 示例数据（品类/产品/供应商/客户）
+    │   ├── db.ts                 # 前端 API 调用封装（对接云函数）
+    │   └── seed.ts               # 示例数据生成脚本
     │
     ├── utils/
     │   └── excel.ts              # Excel 导入导出工具
@@ -167,7 +167,9 @@ Category（品类）──< Product（产品）──< Inventory（库存）
 | orderDate | string | 采购日期 |
 | totalAmount | number | 总金额 |
 | status | string | `draft` → `confirmed` → `received` / `cancelled` |
-| items | PurchaseItem[] | 采购明细 |
+| extOrderNo | string | 对方流转单号（可选） |
+| remark | string | 备注信息 |
+*(注：采购明细存储于 `purchase_items` 表中，由 `order_id` 关联)*
 
 ### 4.6 销售单 SalesOrder
 
@@ -181,12 +183,18 @@ Category（品类）──< Product（产品）──< Inventory（库存）
 | discount | number | 折扣金额 |
 | status | string | `draft` → `confirmed` → `shipped` → `completed` / `cancelled` |
 | paymentStatus | string | `pending` → `partial` → `paid` |
-| items | SalesItem[] | 销售明细 |
+| extOrderNo | string | 对方流转单号（可选） |
+| remark | string | 备注信息 |
+*(注：销售明细存储于 `sales_items` 表中，由 `order_id` 关联)*
 
 ### 4.7 库存 Inventory & InventoryLog
 
 - **Inventory**：每个产品一条记录，记录 `currentQty`（当前库存）
-- **InventoryLog**：每次出入库都记录一条流水，包含变动数量、变动后余额、来源类型
+- **InventoryLog**：每次出入库都记录一条流水，包含变动数量、变动后余额、关联的业务单据ID与价格信息
+
+### 4.8 订单流水 OrderLog
+
+- **OrderLog**：记录所有采购单和销售单的状态变更、信息修改记录，供“订单动态”时间轴展示。
 
 ---
 

@@ -62,6 +62,7 @@ export interface PurchaseOrder {
   supplierId: string;    // 供应商
   orderDate: string;     // 日期
   totalAmount: number;   // 总金额
+  extOrderNo?: string;   // 对方单号
   status: OrderStatus;   // 状态
   remark?: string;
   items: PurchaseItem[];
@@ -83,6 +84,7 @@ export interface SalesOrder {
   customerId: string;    // 客户
   orderDate: string;     // 日期
   totalAmount: number;   // 总金额
+  extOrderNo?: string;   // 对方单号
   discount: number;      // 折扣金额
   status: OrderStatus;   // 状态
   paymentStatus: PaymentStatus;  // 收款状态
@@ -112,13 +114,21 @@ export type InventoryRefType = 'purchase' | 'sales' | 'adjust';
 export interface InventoryLog {
   id: string;
   productId: string;
-  type: InventoryLogType;         // 出/入/调整
-  quantityChange: number;         // 变动数量
-  balance: number;                // 变动后余额
-  refType: InventoryRefType;      // 关联类型
-  refId: string;                  // 关联单号ID
-  operator: string;               // 操作人
-  createdAt: string;
+  type: 'in' | 'out' | 'adjust'; // 入库 | 出库 | 调整
+  quantity: number;      // 变动数量（+/-）
+  balance: number;       // 变动后余额
+  remark?: string;       // 备注/来源信息
+  operator: string;      // 操作人
+  createdAt: string;     // 时间
+  // 富文本关联字段（用于历史明细展示）
+  poNo?: string;
+  poExtNo?: string;
+  supplierName?: string;
+  purchasePrice?: number;
+  soNo?: string;
+  soExtNo?: string;
+  customerName?: string;
+  salePrice?: number;
 }
 
 // Dashboard统计

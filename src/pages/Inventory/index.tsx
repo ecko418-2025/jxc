@@ -11,9 +11,9 @@ import {
   WarningOutlined, CheckCircleOutlined, EditOutlined,
   HistoryOutlined, AlertOutlined,
 } from '@ant-design/icons';
-import { inventoryDB, productDB, categoryDB, inventoryLogDB } from '../../database/db';
-import type { Product, InventoryLog, Category, InventoryRecord } from '../../database/types';
-import dayjs from 'dayjs';
+import { inventoryDB, productDB, categoryDB } from '../../database/db';
+import type { Product, Category, InventoryRecord } from '../../database/types';
+import ProductHistoryModal from '../../components/ProductHistoryModal';
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -31,8 +31,6 @@ const InventoryPage: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [adjustQty, setAdjustQty] = useState(0);
   
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [logs, setLogs] = useState<InventoryLog[]>([]);
 
   const refreshData = useCallback(async () => {
     try {
@@ -98,20 +96,9 @@ const InventoryPage: React.FC = () => {
     }
   };
 
-  const showLogs = async (product: Product) => {
+  const showLogs = (product: Product) => {
     setSelectedProduct(product);
-    setLogsLoading(true);
     setLogModalOpen(true);
-    try {
-      const data = await inventoryLogDB.getByProductId(product.id);
-      setLogs(data.sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      ));
-    } catch (error: any) {
-      message.error('获取流水失败');
-    } finally {
-      setLogsLoading(false);
-    }
   };
 
   const columns = [
@@ -119,7 +106,11 @@ const InventoryPage: React.FC = () => {
       title: '编码',
       dataIndex: 'sku',
       width: 100,
-      render: (sku: string) => <Text style={{ fontFamily: 'monospace', color: 'var(--text-accent)' }}>{sku}</Text>,
+      render: (sku: string, record: any) => (
+        <a onClick={() => showLogs(record)} style={{ fontFamily: 'monospace', color: 'var(--primary-color)' }}>
+          {sku}
+        </a>
+      ),
     },
     {
       title: '产品名称',
@@ -194,12 +185,6 @@ const InventoryPage: React.FC = () => {
       ),
     },
   ];
-
-  const logTypeMap = {
-    in: { color: 'success', text: '入库' },
-    out: { color: 'error', text: '出库' },
-    adjust: { color: 'warning', text: '调整' },
-  };
 
   return (
     <div>
@@ -283,61 +268,12 @@ const InventoryPage: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Log Modal */}
-      <Modal
-        title={`出入库流水 - ${selectedProduct?.name}`}
+      <ProductHistoryModal
         open={logModalOpen}
-        onCancel={() => setLogModalOpen(false)}
-        footer={null}
-        width={700}
-      >
-        <Table
-          loading={logsLoading}
-          dataSource={logs}
-          rowKey="id"
-          size="small"
-          pagination={{ defaultPageSize: 10, showSizeChanger: true }}
-          columns={[
-            {
-              title: '时间',
-              dataIndex: 'createdAt',
-              width: 170,
-              render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm:ss'),
-            },
-            {
-              title: '类型',
-              dataIndex: 'type',
-              width: 80,
-              render: (t: string) => <Tag color={(logTypeMap as any)[t]?.color}>{(logTypeMap as any)[t]?.text}</Tag>,
-            },
-            {
-              title: '变动',
-              dataIndex: 'quantity',
-              width: 80,
-              render: (v: number, record: any) => {
-                const amount = record.type === 'out' && v > 0 ? -v : v;
-                return (
-                  <Text style={{ color: amount > 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
-                    {amount > 0 ? '+' : ''}{amount}
-                  </Text>
-                );
-              },
-            },
-            {
-              title: '余额',
-              dataIndex: 'balance',
-              width: 80,
-              render: (v: number) => <Text strong>{v}</Text>,
-            },
-            {
-              title: '备注',
-              dataIndex: 'remark',
-              width: 100,
-            },
-            { title: '操作人', dataIndex: 'operator', width: 80 },
-          ]}
-        />
-      </Modal>
+        productId={selectedProduct?.id || ''}
+        productName={selectedProduct?.name || ''}
+        onClose={() => setLogModalOpen(false)}
+      />
     </div>
   );
 };

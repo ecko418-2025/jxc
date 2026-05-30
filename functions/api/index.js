@@ -54,6 +54,15 @@ exports.main = async (event, context) => {
         const [rows] = await pool.query('SELECT * FROM categories ORDER BY created_at DESC');
         return { code: 200, data: rows.map(r => ({ ...r, parentId: r.parent_id })) };
       }
+      case 'migrate': {
+        try {
+          await pool.query("ALTER TABLE purchase_orders ADD COLUMN ext_order_no VARCHAR(100) DEFAULT '' AFTER status;");
+        } catch(e){}
+        try {
+          await pool.query("ALTER TABLE sales_orders ADD COLUMN ext_order_no VARCHAR(100) DEFAULT '' AFTER payment_status;");
+        } catch(e){}
+        return { code: 200, message: 'Migrated' };
+      }
       case 'createCategory': {
         const { code, name, parentId, description } = payload;
         const id = payload.id || crypto.randomUUID();
@@ -205,16 +214,17 @@ exports.main = async (event, context) => {
           order.orderNo = order.order_no;
           order.orderDate = order.order_date;
           order.totalAmount = parseFloat(order.total_amount);
+          order.extOrderNo = order.ext_order_no;
         }
         return { code: 200, data: orders };
       }
       case 'createPurchaseOrder': {
-        const { supplierId, orderDate, totalAmount, status, remark, items } = payload;
+        const { supplierId, orderDate, totalAmount, status, extOrderNo, remark, items } = payload;
         const id = payload.id || crypto.randomUUID();
         const orderNo = 'PO' + Date.now();
         await pool.query(
-          'INSERT INTO purchase_orders (id, order_no, supplier_id, order_date, total_amount, status, remark) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [id, orderNo, supplierId, orderDate, totalAmount, status, remark || '']
+          'INSERT INTO purchase_orders (id, order_no, supplier_id, order_date, total_amount, status, ext_order_no, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [id, orderNo, supplierId, orderDate, totalAmount, status, extOrderNo || '', remark || '']
         );
         if (items && items.length > 0) {
           for (const item of items) {
@@ -230,6 +240,12 @@ exports.main = async (event, context) => {
       case 'deletePurchaseOrder': {
         await pool.query('DELETE FROM purchase_items WHERE order_id = ?', [payload.id]);
         await pool.query('DELETE FROM purchase_orders WHERE id = ?', [payload.id]);
+        return { code: 200, message: 'Success' };
+      }
+      case 'updatePurchaseOrderInfo': {
+        const { id, extOrderNo, remark, operator } = payload;
+        await pool.query('UPDATE purchase_orders SET ext_order_no = ?, remark = ? WHERE id = ?', [extOrderNo, remark, id]);
+        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'update_info', `修改了订单信息 (对方单号/备注)`, operator || '系统']);
         return { code: 200, message: 'Success' };
       }
       case 'updatePurchaseOrder': {
@@ -303,16 +319,17 @@ exports.main = async (event, context) => {
           order.orderDate = order.order_date;
           order.totalAmount = parseFloat(order.total_amount);
           order.paymentStatus = order.payment_status;
+          order.extOrderNo = order.ext_order_no;
         }
         return { code: 200, data: orders };
       }
       case 'createSalesOrder': {
-        const { customerId, orderDate, totalAmount, discount, status, paymentStatus, remark, items } = payload;
+        const { customerId, orderDate, totalAmount, discount, status, paymentStatus, extOrderNo, remark, items } = payload;
         const id = payload.id || crypto.randomUUID();
         const orderNo = 'SO' + Date.now();
         await pool.query(
-          'INSERT INTO sales_orders (id, order_no, customer_id, order_date, total_amount, discount, status, payment_status, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [id, orderNo, customerId, orderDate, totalAmount, discount || 0, status, paymentStatus, remark || '']
+          'INSERT INTO sales_orders (id, order_no, customer_id, order_date, total_amount, discount, status, payment_status, ext_order_no, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [id, orderNo, customerId, orderDate, totalAmount, discount || 0, status, paymentStatus, extOrderNo || '', remark || '']
         );
         if (items && items.length > 0) {
           for (const item of items) {
@@ -328,6 +345,12 @@ exports.main = async (event, context) => {
       case 'deleteSalesOrder': {
         await pool.query('DELETE FROM sales_items WHERE order_id = ?', [payload.id]);
         await pool.query('DELETE FROM sales_orders WHERE id = ?', [payload.id]);
+        return { code: 200, message: 'Success' };
+      }
+      case 'updateSalesOrderInfo': {
+        const { id, extOrderNo, remark, operator } = payload;
+        await pool.query('UPDATE sales_orders SET ext_order_no = ?, remark = ? WHERE id = ?', [extOrderNo, remark, id]);
+        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_info', `修改了订单信息 (对方单号/备注)`, operator || '系统']);
         return { code: 200, message: 'Success' };
       }
       case 'updateSalesOrder': {
@@ -435,10 +458,20 @@ exports.main = async (event, context) => {
         const [rows] = await pool.query(`
           SELECT l.*, 
                  po.order_no as po_no, 
-                 so.order_no as so_no 
+                 po.ext_order_no as po_ext_no,
+                 sup.name as supplier_name,
+                 pi.unit_price as purchase_price,
+                 so.order_no as so_no,
+                 so.ext_order_no as so_ext_no,
+                 cus.name as customer_name,
+                 si.unit_price as sale_price
           FROM inventory_logs l
           LEFT JOIN purchase_orders po ON l.ref_type = 'purchase' AND l.ref_id = po.id
+          LEFT JOIN purchase_items pi ON pi.order_id = po.id AND pi.product_id = l.product_id
+          LEFT JOIN suppliers sup ON po.supplier_id = sup.id
           LEFT JOIN sales_orders so ON l.ref_type = 'sales' AND l.ref_id = so.id
+          LEFT JOIN sales_items si ON si.order_id = so.id AND si.product_id = l.product_id
+          LEFT JOIN customers cus ON so.customer_id = cus.id
           WHERE l.product_id = ? 
           ORDER BY l.created_at DESC 
           LIMIT 100
@@ -448,8 +481,14 @@ exports.main = async (event, context) => {
           data: rows.map(r => {
             let remark = '';
             if (r.ref_type === 'adjust') remark = '人工调整';
-            else if (r.ref_type === 'purchase') remark = r.po_no ? `采购入库 (${r.po_no})` : '采购入库';
-            else if (r.ref_type === 'sales') remark = r.so_no ? `销售出库 (${r.so_no})` : '销售出库';
+            else if (r.ref_type === 'purchase') {
+              remark = r.po_no ? `采购入库 (${r.po_no})` : '采购入库';
+              if (r.po_ext_no) remark += ` - 对方单号: ${r.po_ext_no}`;
+            }
+            else if (r.ref_type === 'sales') {
+              remark = r.so_no ? `销售出库 (${r.so_no})` : '销售出库';
+              if (r.so_ext_no) remark += ` - 对方单号: ${r.so_ext_no}`;
+            }
 
             return {
               id: r.id,
@@ -459,7 +498,15 @@ exports.main = async (event, context) => {
               balance: r.balance,
               operator: r.operator,
               createdAt: r.created_at,
-              remark
+              remark,
+              poNo: r.po_no,
+              poExtNo: r.po_ext_no,
+              supplierName: r.supplier_name,
+              purchasePrice: r.purchase_price,
+              soNo: r.so_no,
+              soExtNo: r.so_ext_no,
+              customerName: r.customer_name,
+              salePrice: r.sale_price
             };
           }) 
         };
