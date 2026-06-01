@@ -11,8 +11,9 @@ import {
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined,
   DownloadOutlined, FileExcelOutlined,
-  AppstoreOutlined, UnorderedListOutlined, LoadingOutlined,
+  AppstoreOutlined, UnorderedListOutlined, LoadingOutlined
 } from '@ant-design/icons';
+import { CloudImage } from '../../components/CloudImage';
 
 import { productDB, categoryDB, inventoryDB, tcbApp } from '../../database/db';
 import type { Product, Category, InventoryRecord } from '../../database/types';
@@ -222,7 +223,7 @@ const ProductsPage: React.FC = () => {
       title: '图片',
       dataIndex: 'imageUrl',
       width: 60,
-      render: (url: string) => url ? <img src={url} alt="img" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 40, height: 40, background: '#334155', borderRadius: 4 }} />,
+      render: (url: string) => url ? <CloudImage src={url} alt="img" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 40, height: 40, background: '#334155', borderRadius: 4 }} />,
     },
     {
       title: '编码',
@@ -606,11 +607,10 @@ const ProductsPage: React.FC = () => {
                         cloudPath: `products/${fileName}`,
                         filePath: f as any,
                       });
-                      const tempUrlRes = await tcbApp.getTempFileURL({ fileList: [res.fileID] });
-                      const finalUrl = tempUrlRes.fileList?.[0]?.tempFileURL || '';
-                      productForm.setFieldValue('imageUrl', finalUrl);
-                      setCurrentImageUrl(finalUrl);
-                      onSuccess?.(finalUrl);
+                      const fileID = res.fileID;
+                      productForm.setFieldValue('imageUrl', fileID);
+                      setCurrentImageUrl(fileID);
+                      onSuccess?.(fileID);
                       message.success('图片上传成功');
                     } catch (err) {
                       message.error('上传失败');
@@ -620,7 +620,7 @@ const ProductsPage: React.FC = () => {
                     }
                   }}
                 >
-                  {currentImageUrl ? <img src={currentImageUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} /> : (
+                  {currentImageUrl ? <CloudImage src={currentImageUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} /> : (
                     <div>
                       {uploadingImage ? <LoadingOutlined /> : <PlusOutlined />}
                       <div style={{ marginTop: 8 }}>上传图片</div>

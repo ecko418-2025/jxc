@@ -13,10 +13,12 @@ import {
 } from '@ant-design/icons';
 import { inventoryDB, productDB, categoryDB } from '../../database/db';
 import type { Product, Category, InventoryRecord } from '../../database/types';
+import { CloudImage } from '../../components/CloudImage';
 import ProductHistoryModal from '../../components/ProductHistoryModal';
 
 const { Text } = Typography;
 const { Search } = Input;
+
 
 const InventoryPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -106,7 +108,7 @@ const InventoryPage: React.FC = () => {
       title: '图片',
       dataIndex: 'imageUrl',
       width: 60,
-      render: (url: string) => url ? <img src={url} alt="img" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 40, height: 40, background: '#334155', borderRadius: 4 }} />,
+      render: (url: string) => url ? <CloudImage src={url} alt="img" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 40, height: 40, background: '#334155', borderRadius: 4 }} />,
     },
     {
       title: '编码',
