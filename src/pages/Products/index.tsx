@@ -97,11 +97,12 @@ const ProductsPage: React.FC = () => {
   const handleSaveProduct = async () => {
     try {
       const values = await productForm.validateFields();
+      const productData = { ...values, imageUrl: currentImageUrl };
       if (editingProduct) {
-        await productDB.update(editingProduct.id, values);
+        await productDB.update(editingProduct.id, productData);
         message.success('产品已更新');
       } else {
-        await productDB.create(values);
+        await productDB.create(productData);
         message.success('产品已添加');
       }
       setProductModalOpen(false);
@@ -590,7 +591,7 @@ const ProductsPage: React.FC = () => {
           </Row>
           <Row gutter={16}>
             <Col span={24}>
-              <Form.Item name="imageUrl" label="商品图片 (可选)">
+              <Form.Item label="商品图片 (可选)">
                 <Upload
                   name="avatar"
                   listType="picture-card"
