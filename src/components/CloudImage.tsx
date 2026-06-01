@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { Image } from 'antd';
 import { tcbApp } from '../database/db';
 
 interface CloudImageProps {
   src?: string;
   alt?: string;
   style?: React.CSSProperties;
+  preview?: boolean;
 }
 
-export const CloudImage: React.FC<CloudImageProps> = ({ src, alt, style }) => {
+export const CloudImage: React.FC<CloudImageProps> = ({ src, alt, style, preview = true }) => {
   const [url, setUrl] = useState<string>('');
 
   useEffect(() => {
@@ -60,5 +62,9 @@ export const CloudImage: React.FC<CloudImageProps> = ({ src, alt, style }) => {
     return <div style={{ ...style, background: '#334155' }} />;
   }
 
-  return <img src={url} alt={alt || 'img'} style={style} />;
+  return (
+    <div style={{ display: 'inline-block', lineHeight: 0 }} onClick={(e) => preview && e.stopPropagation()}>
+      <Image src={url} alt={alt || 'img'} style={style} preview={preview} />
+    </div>
+  );
 };

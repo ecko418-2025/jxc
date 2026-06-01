@@ -620,7 +620,7 @@ const ProductsPage: React.FC = () => {
                     }
                   }}
                 >
-                  {currentImageUrl ? <CloudImage src={currentImageUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} /> : (
+                  {currentImageUrl ? <CloudImage preview={false} src={currentImageUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} /> : (
                     <div>
                       {uploadingImage ? <LoadingOutlined /> : <PlusOutlined />}
                       <div style={{ marginTop: 8 }}>上传图片</div>
