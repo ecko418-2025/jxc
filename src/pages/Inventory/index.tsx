@@ -103,6 +103,12 @@ const InventoryPage: React.FC = () => {
 
   const columns = [
     {
+      title: '图片',
+      dataIndex: 'imageUrl',
+      width: 60,
+      render: (url: string) => url ? <img src={url} alt="img" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 40, height: 40, background: '#334155', borderRadius: 4 }} />,
+    },
+    {
       title: '编码',
       dataIndex: 'sku',
       width: 100,

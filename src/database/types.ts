@@ -23,6 +23,7 @@ export interface Product {
   purchasePrice: number;  // 采购价
   salePrice: number;      // 销售价
   minStock: number;    // 最低库存预警
+  imageUrl?: string;   // 商品图片URL
   active: boolean;     // 是否启用
   createdAt: string;
   updatedAt: string;

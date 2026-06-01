@@ -11,10 +11,10 @@ import {
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined,
   DownloadOutlined, FileExcelOutlined,
-  AppstoreOutlined, UnorderedListOutlined,
+  AppstoreOutlined, UnorderedListOutlined, LoadingOutlined,
 } from '@ant-design/icons';
 
-import { productDB, categoryDB, inventoryDB } from '../../database/db';
+import { productDB, categoryDB, inventoryDB, tcbApp } from '../../database/db';
 import type { Product, Category, InventoryRecord } from '../../database/types';
 import {
   downloadCategoryTemplate, downloadProductTemplate,
@@ -42,6 +42,9 @@ const ProductsPage: React.FC = () => {
   const [importType, setImportType] = useState<'category' | 'product'>('product');
   const [productForm] = Form.useForm();
   const [categoryForm] = Form.useForm();
+  
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string>('');
   const [activeTab, setActiveTab] = useState('products');
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -111,9 +114,16 @@ const ProductsPage: React.FC = () => {
     }
   };
 
-  const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
-    productForm.setFieldsValue(product);
+  const handleEditProduct = (product: Product | null) => {
+    if (product) {
+      setEditingProduct(product);
+      setCurrentImageUrl(product.imageUrl || '');
+      productForm.setFieldsValue(product);
+    } else {
+      setEditingProduct(null);
+      setCurrentImageUrl('');
+      productForm.resetFields();
+    }
     setProductModalOpen(true);
   };
 
@@ -207,6 +217,12 @@ const ProductsPage: React.FC = () => {
 
   // Table columns for products
   const productColumns = [
+    {
+      title: '图片',
+      dataIndex: 'imageUrl',
+      width: 60,
+      render: (url: string) => url ? <img src={url} alt="img" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 40, height: 40, background: '#334155', borderRadius: 4 }} />,
+    },
     {
       title: '编码',
       dataIndex: 'sku',
@@ -569,6 +585,47 @@ const ProductsPage: React.FC = () => {
             <Col span={8}>
               <Form.Item name="active" label="状态" valuePropName="checked">
                 <Switch checkedChildren="启用" unCheckedChildren="停用" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item name="imageUrl" label="商品图片 (可选)">
+                <Upload
+                  name="avatar"
+                  listType="picture-card"
+                  showUploadList={false}
+                  customRequest={async (options) => {
+                    const { file, onSuccess, onError } = options;
+                    try {
+                      setUploadingImage(true);
+                      const f = file as File;
+                      const fileName = `${Date.now()}_${f.name}`;
+                      const res = await tcbApp.uploadFile({
+                        cloudPath: `products/${fileName}`,
+                        filePath: f as any,
+                      });
+                      const tempUrlRes = await tcbApp.getTempFileURL({ fileList: [res.fileID] });
+                      const finalUrl = tempUrlRes.fileList?.[0]?.tempFileURL || '';
+                      productForm.setFieldValue('imageUrl', finalUrl);
+                      setCurrentImageUrl(finalUrl);
+                      onSuccess?.(finalUrl);
+                      message.success('图片上传成功');
+                    } catch (err) {
+                      message.error('上传失败');
+                      onError?.(err as any);
+                    } finally {
+                      setUploadingImage(false);
+                    }
+                  }}
+                >
+                  {currentImageUrl ? <img src={currentImageUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} /> : (
+                    <div>
+                      {uploadingImage ? <LoadingOutlined /> : <PlusOutlined />}
+                      <div style={{ marginTop: 8 }}>上传图片</div>
+                    </div>
+                  )}
+                </Upload>
               </Form.Item>
             </Col>
           </Row>

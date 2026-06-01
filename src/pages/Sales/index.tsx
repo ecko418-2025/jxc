@@ -416,6 +416,15 @@ const SalesPage: React.FC = () => {
           pagination={false}
           columns={[
             {
+              title: '图片',
+              dataIndex: 'productId',
+              width: 50,
+              render: (v: string) => {
+                const p = products.find(prod => prod.id === v);
+                return p?.imageUrl ? <img src={p.imageUrl} alt="img" style={{ width: 32, height: 32, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 32, height: 32, background: '#334155', borderRadius: 4 }} />;
+              },
+            },
+            {
               title: '产品',
               dataIndex: 'productId',
               width: 200,
@@ -451,8 +460,11 @@ const SalesPage: React.FC = () => {
                       
                       return (
                         <Select.Option key={p.id} value={p.id} title={titleText}>
-                          <div style={{ color: isLowStock ? '#ef4444' : 'inherit', display: 'flex', justifyContent: 'space-between' }}>
-                            <span>{titleText}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {p.imageUrl ? <img src={p.imageUrl} alt="img" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 24, height: 24, background: '#334155', borderRadius: 4 }} />}
+                              <span style={{ color: isLowStock ? '#ef4444' : 'inherit' }}>{titleText}</span>
+                            </div>
                             {isLowStock && <span style={{ fontSize: '0.85em', color: '#ef4444' }}>库存预警</span>}
                           </div>
                         </Select.Option>
@@ -523,6 +535,10 @@ const SalesPage: React.FC = () => {
               size="small"
               pagination={false}
               columns={[
+                { title: '图片', dataIndex: 'productId', render: (id: string) => {
+                  const p = products.find(prod => prod.id === id);
+                  return p?.imageUrl ? <img src={p.imageUrl} alt="img" style={{ width: 32, height: 32, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 32, height: 32, background: '#334155', borderRadius: 4 }} />;
+                } },
                 { title: '产品', dataIndex: 'productId', render: (id: string) => products.find(p => p.id === id)?.name || '—' },
                 { title: '数量', dataIndex: 'quantity' },
                 { title: '单价', dataIndex: 'unitPrice', render: (v: number) => `¥${Number(v).toFixed(2)}` },

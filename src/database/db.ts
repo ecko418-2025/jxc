@@ -14,6 +14,7 @@ import type {
 const app = cloudbase.init({
   env: 'cshj001-d7g5f1k0tc94d4181', // 腾讯云环境 ID
 });
+export const tcbApp = app;
 export const auth = app.auth({ persistence: 'local' });
 
 // ========================

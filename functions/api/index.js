@@ -61,6 +61,9 @@ exports.main = async (event, context) => {
         try {
           await pool.query("ALTER TABLE sales_orders ADD COLUMN ext_order_no VARCHAR(100) DEFAULT '' AFTER payment_status;");
         } catch(e){}
+        try {
+          await pool.query("ALTER TABLE products ADD COLUMN image_url VARCHAR(500) DEFAULT '' AFTER min_stock;");
+        } catch(e){}
         return { code: 200, message: 'Migrated' };
       }
       case 'createCategory': {
@@ -94,18 +97,19 @@ exports.main = async (event, context) => {
           purchasePrice: parseFloat(p.purchase_price),
           salePrice: parseFloat(p.sale_price),
           minStock: p.min_stock,
+          imageUrl: p.image_url,
           active: p.active === 1
         }));
         return { code: 200, data: products };
       }
       case 'createProduct': {
-        const { sku, name, categoryId, unit, spec, brand, purchasePrice, salePrice, minStock, active } = payload;
+        const { sku, name, categoryId, unit, spec, brand, purchasePrice, salePrice, minStock, active, imageUrl } = payload;
         const id = payload.id || crypto.randomUUID();
         await pool.query(
           `INSERT INTO products 
-          (id, sku, name, category_id, unit, spec, brand, purchase_price, sale_price, min_stock, active) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [id, sku, name, categoryId, unit, spec, brand, purchasePrice, salePrice, minStock, active ? 1 : 0]
+          (id, sku, name, category_id, unit, spec, brand, purchase_price, sale_price, min_stock, active, image_url) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, sku, name, categoryId, unit, spec, brand, purchasePrice, salePrice, minStock, active ? 1 : 0, imageUrl || '']
         );
         await pool.query('INSERT IGNORE INTO inventory (product_id, current_qty) VALUES (?, 0)', [id]);
         return { code: 200, message: 'Success', data: { id } };
@@ -115,10 +119,10 @@ exports.main = async (event, context) => {
         for (const p of products) {
           const id = p.id || crypto.randomUUID();
           await pool.query(
-            `INSERT IGNORE INTO products 
-            (id, sku, name, category_id, unit, spec, brand, purchase_price, sale_price, min_stock, active) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, p.sku, p.name, p.categoryId, p.unit, p.spec, p.brand, p.purchasePrice, p.salePrice, p.minStock, p.active ? 1 : 0]
+            `INSERT INTO products 
+            (id, sku, name, category_id, unit, spec, brand, purchase_price, sale_price, min_stock, active, image_url) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, p.sku, p.name, p.categoryId, p.unit, p.spec, p.brand, p.purchasePrice, p.salePrice, p.minStock, p.active ? 1 : 0, p.imageUrl || '']
           );
           await pool.query('INSERT IGNORE INTO inventory (product_id, current_qty) VALUES (?, 0)', [id]);
         }
@@ -131,6 +135,7 @@ exports.main = async (event, context) => {
         if (updateFields.purchasePrice !== undefined) { updateFields.purchase_price = updateFields.purchasePrice; delete updateFields.purchasePrice; }
         if (updateFields.salePrice !== undefined) { updateFields.sale_price = updateFields.salePrice; delete updateFields.salePrice; }
         if (updateFields.minStock !== undefined) { updateFields.min_stock = updateFields.minStock; delete updateFields.minStock; }
+        if (updateFields.imageUrl !== undefined) { updateFields.image_url = updateFields.imageUrl; delete updateFields.imageUrl; }
 
         if (Object.keys(updateFields).length > 0) {
           const setClause = Object.keys(updateFields).map(k => `${k} = ?`).join(', ');
