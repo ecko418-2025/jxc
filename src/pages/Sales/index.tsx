@@ -160,10 +160,10 @@ const SalesPage: React.FC = () => {
     if (!detailOrder) return;
     try {
       const values = await infoForm.validateFields();
-      await salesOrderDB.updateInfo(detailOrder.id, values.extOrderNo || '', values.remark || '', '系统');
+      await salesOrderDB.updateInfo(detailOrder.id, values.extOrderNo || '', values.invoiceNo || '', values.remark || '', '系统');
       message.success('订单信息已更新');
       setEditingInfo(false);
-      setDetailOrder({ ...detailOrder, extOrderNo: values.extOrderNo, remark: values.remark });
+      setDetailOrder({ ...detailOrder, extOrderNo: values.extOrderNo, invoiceNo: values.invoiceNo, remark: values.remark });
       refreshData();
     } catch (error: any) {
       message.error('更新失败: ' + (error.message || ''));
@@ -566,8 +566,8 @@ const SalesPage: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <Text strong>附加信息</Text>
                 {!editingInfo ? (
-                  <Button size="small" type="link" onClick={() => {
-                    infoForm.setFieldsValue({ extOrderNo: detailOrder.extOrderNo, remark: detailOrder.remark });
+                  <Button size="small" type="dashed" onClick={() => {
+                    infoForm.setFieldsValue({ extOrderNo: detailOrder.extOrderNo, invoiceNo: detailOrder.invoiceNo, remark: detailOrder.remark });
                     setEditingInfo(true);
                   }}>修改信息</Button>
                 ) : (
@@ -581,6 +581,7 @@ const SalesPage: React.FC = () => {
               {!editingInfo ? (
                 <>
                   <div style={{ marginBottom: 4 }}><Text type="secondary">对方单号: </Text><Text>{detailOrder.extOrderNo || '—'}</Text></div>
+                  <div style={{ marginBottom: 4 }}><Text type="secondary">发票编号: </Text><Text>{detailOrder.invoiceNo || '—'}</Text></div>
                   <div><Text type="secondary">备注: </Text><Text>{detailOrder.remark || '—'}</Text></div>
                 </>
               ) : (
