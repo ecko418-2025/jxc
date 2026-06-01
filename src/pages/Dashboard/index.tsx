@@ -96,7 +96,10 @@ const Dashboard: React.FC = () => {
         // Recent orders
         const recentSales = [...salesOrders].sort((a, b) => 
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        ).slice(0, 5);
+        ).slice(0, 10).map(o => {
+          const customer = customers.find(c => c.id === o.customerId);
+          return { ...o, customerName: customer ? customer.name : '未知客户' };
+        });
 
         setStats({
           todaySales,
@@ -235,7 +238,7 @@ const Dashboard: React.FC = () => {
                 size="small"
                 pagination={false}
                 columns={[
-                  { title: '单号', dataIndex: 'orderNo', width: 160 },
+                  { title: '客户名称', dataIndex: 'customerName', width: 160 },
                   { title: '日期', dataIndex: 'orderDate', width: 100, render: (d: string) => dayjs(d).format('MM-DD') },
                   {
                     title: '金额',
