@@ -220,16 +220,17 @@ exports.main = async (event, context) => {
           order.orderDate = order.order_date;
           order.totalAmount = parseFloat(order.total_amount);
           order.extOrderNo = order.ext_order_no;
+          order.invoiceNo = order.invoice_no;
         }
         return { code: 200, data: orders };
       }
       case 'createPurchaseOrder': {
-        const { supplierId, orderDate, totalAmount, status, extOrderNo, remark, items } = payload;
+        const { supplierId, orderDate, totalAmount, status, extOrderNo, invoiceNo, remark, items } = payload;
         const id = payload.id || crypto.randomUUID();
         const orderNo = 'PO' + Date.now();
         await pool.query(
-          'INSERT INTO purchase_orders (id, order_no, supplier_id, order_date, total_amount, status, ext_order_no, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [id, orderNo, supplierId, orderDate, totalAmount, status, extOrderNo || '', remark || '']
+          'INSERT INTO purchase_orders (id, order_no, supplier_id, order_date, total_amount, status, ext_order_no, invoice_no, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [id, orderNo, supplierId, orderDate, totalAmount, status, extOrderNo || '', invoiceNo || '', remark || '']
         );
         if (items && items.length > 0) {
           for (const item of items) {
@@ -248,9 +249,9 @@ exports.main = async (event, context) => {
         return { code: 200, message: 'Success' };
       }
       case 'updatePurchaseOrderInfo': {
-        const { id, extOrderNo, remark, operator } = payload;
-        await pool.query('UPDATE purchase_orders SET ext_order_no = ?, remark = ? WHERE id = ?', [extOrderNo, remark, id]);
-        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'update_info', `修改了订单信息 (对方单号/备注)`, operator || '系统']);
+        const { id, extOrderNo, invoiceNo, remark, operator } = payload;
+        await pool.query('UPDATE purchase_orders SET ext_order_no = ?, invoice_no = ?, remark = ? WHERE id = ?', [extOrderNo, invoiceNo || '', remark, id]);
+        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'update_info', `修改了订单信息 (发票编号/对方单号/备注)`, operator || '系统']);
         return { code: 200, message: 'Success' };
       }
       case 'updatePurchaseOrder': {
@@ -325,16 +326,17 @@ exports.main = async (event, context) => {
           order.totalAmount = parseFloat(order.total_amount);
           order.paymentStatus = order.payment_status;
           order.extOrderNo = order.ext_order_no;
+          order.invoiceNo = order.invoice_no;
         }
         return { code: 200, data: orders };
       }
       case 'createSalesOrder': {
-        const { customerId, orderDate, totalAmount, discount, status, paymentStatus, extOrderNo, remark, items } = payload;
+        const { customerId, orderDate, totalAmount, discount, status, paymentStatus, extOrderNo, invoiceNo, remark, items } = payload;
         const id = payload.id || crypto.randomUUID();
         const orderNo = 'SO' + Date.now();
         await pool.query(
-          'INSERT INTO sales_orders (id, order_no, customer_id, order_date, total_amount, discount, status, payment_status, ext_order_no, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [id, orderNo, customerId, orderDate, totalAmount, discount || 0, status, paymentStatus, extOrderNo || '', remark || '']
+          'INSERT INTO sales_orders (id, order_no, customer_id, order_date, total_amount, discount, status, payment_status, ext_order_no, invoice_no, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [id, orderNo, customerId, orderDate, totalAmount, discount || 0, status, paymentStatus, extOrderNo || '', invoiceNo || '', remark || '']
         );
         if (items && items.length > 0) {
           for (const item of items) {
@@ -353,9 +355,9 @@ exports.main = async (event, context) => {
         return { code: 200, message: 'Success' };
       }
       case 'updateSalesOrderInfo': {
-        const { id, extOrderNo, remark, operator } = payload;
-        await pool.query('UPDATE sales_orders SET ext_order_no = ?, remark = ? WHERE id = ?', [extOrderNo, remark, id]);
-        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_info', `修改了订单信息 (对方单号/备注)`, operator || '系统']);
+        const { id, extOrderNo, invoiceNo, remark, operator } = payload;
+        await pool.query('UPDATE sales_orders SET ext_order_no = ?, invoice_no = ?, remark = ? WHERE id = ?', [extOrderNo, invoiceNo || '', remark, id]);
+        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_info', `修改了订单信息 (发票编号/对方单号/备注)`, operator || '系统']);
         return { code: 200, message: 'Success' };
       }
       case 'updateSalesOrder': {

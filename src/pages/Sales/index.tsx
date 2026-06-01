@@ -263,6 +263,12 @@ const SalesPage: React.FC = () => {
       render: (text: string) => <Text type="secondary">{text || '—'}</Text>,
     },
     {
+      title: '相关发票编号',
+      dataIndex: 'invoiceNo',
+      width: 120,
+      render: (text: string) => <Text type="secondary">{text || '—'}</Text>,
+    },
+    {
       title: '状态',
       dataIndex: 'status',
       width: 90,
@@ -398,6 +404,11 @@ const SalesPage: React.FC = () => {
             <Col span={4}>
               <Form.Item name="extOrderNo" label="对方单号(可选)">
                 <Input placeholder="对方核对流转的单号" />
+              </Form.Item>
+            </Col>
+            <Col span={4}>
+              <Form.Item name="invoiceNo" label="发票编号(可选)">
+                <Input placeholder="发票编号" />
               </Form.Item>
             </Col>
             <Col span={4}>
@@ -580,7 +591,12 @@ const SalesPage: React.FC = () => {
                         <Input placeholder="对方核对流转的单号" />
                       </Form.Item>
                     </Col>
-                    <Col span={12}>
+                    <Col span={8}>
+                      <Form.Item name="invoiceNo" label="发票编号" style={{ marginBottom: 0 }}>
+                        <Input placeholder="发票编号" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
                       <Form.Item name="remark" label="备注" style={{ marginBottom: 0 }}>
                         <Input placeholder="备注信息" />
                       </Form.Item>

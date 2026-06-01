@@ -243,6 +243,12 @@ const PurchasePage: React.FC = () => {
       render: (text: string) => <Text type="secondary">{text || '—'}</Text>,
     },
     {
+      title: '相关发票编号',
+      dataIndex: 'invoiceNo',
+      width: 120,
+      render: (text: string) => <Text type="secondary">{text || '—'}</Text>,
+    },
+    {
       title: '备注',
       dataIndex: 'remark',
       width: 200,
@@ -366,7 +372,12 @@ const PurchasePage: React.FC = () => {
                 <Input placeholder="对方核对流转的单号" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={6}>
+              <Form.Item name="invoiceNo" label="相关发票编号(可选)">
+                <Input placeholder="发票编号" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
               <Form.Item name="remark" label="备注">
                 <Input placeholder="备注" />
               </Form.Item>
@@ -544,7 +555,12 @@ const PurchasePage: React.FC = () => {
                         <Input placeholder="对方核对流转的单号" />
                       </Form.Item>
                     </Col>
-                    <Col span={12}>
+                    <Col span={8}>
+                      <Form.Item name="invoiceNo" label="发票编号" style={{ marginBottom: 0 }}>
+                        <Input placeholder="发票编号" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
                       <Form.Item name="remark" label="备注" style={{ marginBottom: 0 }}>
                         <Input placeholder="备注信息" />
                       </Form.Item>
