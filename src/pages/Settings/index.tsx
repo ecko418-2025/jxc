@@ -632,7 +632,7 @@ const SettingsPage: React.FC = () => {
             label="登录账号(邮箱/用户名)"
             rules={[{ required: true, message: '请输入登录账号' }]}
           >
-            <Input placeholder="例如: lisi@ecko.com" disabled={!!editingUser} />
+            <Input placeholder="例如: lisi@ecko.com" />
           </Form.Item>
           <Form.Item
             name="displayName"

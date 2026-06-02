@@ -866,8 +866,8 @@ exports.main = async (event, context) => {
         const [rows] = await pool.query('SELECT uid FROM users WHERE uid = ?', [uid]);
         if (rows.length > 0) {
           await pool.query(
-            'UPDATE users SET display_name = ?, role = ? WHERE uid = ?',
-            [displayName, role, uid]
+            'UPDATE users SET username = ?, display_name = ?, role = ? WHERE uid = ?',
+            [username || 'user', displayName, role, uid]
           );
         } else {
           await pool.query(
