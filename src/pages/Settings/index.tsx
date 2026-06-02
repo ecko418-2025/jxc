@@ -161,22 +161,46 @@ const SettingsPage: React.FC = () => {
       dataIndex: 'action_type',
       key: 'action_type',
       width: 150,
-      render: (text: string) => <Text code>{text}</Text>
+      render: (text: string) => {
+        const actionMap: Record<string, string> = {
+          'createSalesOrder': '新建销售单',
+          'updateSalesOrder': '修改销售单',
+          'deleteSalesOrder': '删除销售单',
+          'confirmSalesOrder': '确认出库',
+          'createPurchaseOrder': '新建采购单',
+          'updatePurchaseOrder': '修改采购单',
+          'deletePurchaseOrder': '删除采购单',
+          'confirmPurchaseOrder': '确认入库',
+          'createProduct': '添加产品',
+          'updateProduct': '修改产品',
+          'deleteProduct': '删除产品',
+          'adjustInventoryStock': '库存调整',
+          'createCategory': '添加分类',
+          'updateCategory': '修改分类',
+          'deleteCategory': '删除分类',
+          'createSupplier': '添加供应商',
+          'createCustomer': '添加客户'
+        };
+        return <Tag color="cyan">{actionMap[text] || text}</Tag>;
+      }
     },
     {
       title: '详细说明',
       dataIndex: 'message',
       key: 'message',
-      render: (text: string, record: any) => (
-        <Space direction="vertical" size="small">
-          <Text strong>{text}</Text>
-          {record.payload && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              ID: {record.payload.id || record.payload.productId || 'N/A'}
-            </Text>
-          )}
-        </Space>
-      )
+      render: (text: string, record: any) => {
+        const id = record.payload?.id || record.payload?.productId;
+        return (
+          <Space direction="vertical" size="small">
+            <Text strong>{text}</Text>
+            {id && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                系统编码: {id}
+              </Text>
+            )}
+          </Space>
+        );
+      }
     }
   ];
 

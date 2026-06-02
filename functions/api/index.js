@@ -24,12 +24,7 @@ const paymentStatusMap = {
 
 
 async function logAudit(pool, action, payload) {
-  const readActions = [
-    'getCategories', 'getProducts', 'getSuppliers', 'getCustomers', 
-    'getPurchaseOrders', 'getSalesOrders', 'getInventoryLogs', 
-    'getDashboardStats', 'getAuditLogs', 'migrate', 'getOrderLogs'
-  ];
-  if (readActions.includes(action) || !action) return;
+  if (!action || action.startsWith('get') || action === 'migrate') return;
 
   let message = `执行了操作: ${action}`;
   
@@ -47,7 +42,7 @@ async function logAudit(pool, action, payload) {
   if (action === 'updateProduct') message = `修改了产品信息: ${payload.id}`;
   if (action === 'deleteProduct') message = `删除了产品: ${payload.id}`;
   
-  if (action === 'updateInventory') message = `调整了某个单品的库存: ${payload.productId} (变动 ${payload.quantity})`;
+  if (action === 'adjustInventoryStock') message = `调整了某个单品的库存: ${payload.productId} (变动 ${payload.newQty})`;
   
   if (action === 'createCategory') message = `创建了分类: ${payload.name}`;
   if (action === 'updateCategory') message = `更新了分类`;
@@ -619,7 +614,7 @@ exports.main = async (event, context) => {
 
 
       case 'getAuditLogs': {
-        const [rows] = await pool.query('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100');
+        const [rows] = await pool.query("SELECT * FROM audit_logs WHERE action_type NOT LIKE 'get%' ORDER BY created_at DESC LIMIT 100");
         await logAudit(pool, action, payload); return { code: 200, data: rows };
       }
 
