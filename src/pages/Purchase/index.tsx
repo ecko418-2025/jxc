@@ -725,7 +725,22 @@ const PurchasePage: React.FC = () => {
 
       {/* Payment Ledger Details Modal */}
       <Modal
-        title={`付款明细 - ${currentLedgerOrder?.orderNo}`}
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 32 }}>
+            <span>付款明细 - {currentLedgerOrder?.orderNo}</span>
+            {currentLedgerOrder && currentLedgerOrder.status !== 'draft' && currentLedgerOrder.status !== 'cancelled' && currentLedgerOrder.paymentStatus !== 'paid' && (
+              <Button size="small" type="primary" onClick={() => {
+                const balance = currentLedgerOrder.totalAmount - (currentLedgerOrder.paidAmount || 0);
+                paymentForm.setFieldsValue({
+                  amount: balance,
+                  paymentDate: dayjs(),
+                  paymentMethod: 'wechat'
+                });
+                setPaymentModalOpen(true);
+              }}>录入付款</Button>
+            )}
+          </div>
+        }
         open={ledgerModalOpen}
         onCancel={() => {
           setLedgerModalOpen(false);
