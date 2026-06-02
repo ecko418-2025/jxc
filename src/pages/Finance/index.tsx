@@ -3,7 +3,7 @@
 // ========================================
 
 import { useState, useEffect } from 'react';
-import { Table, Card, Typography, Tabs, Tag, message, Button, Input, DatePicker } from 'antd';
+import { Table, Card, Typography, Tabs, Tag, message, Button, Input, DatePicker, Space } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { financeLedgerDB, customerDB, supplierDB, salesOrderDB, purchaseOrderDB } from '../../database/db';
 import type { FinanceLedger, Customer, Supplier, SalesOrder, PurchaseOrder } from '../../database/types';
@@ -125,13 +125,22 @@ export default function Finance() {
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <Title level={2} style={{ margin: 0 }}>财务管理</Title>
-        <Input.Search 
-          placeholder="搜索客户/供应商/备注" 
-          allowClear 
-          onSearch={setSearchText}
-          onChange={e => setSearchText(e.target.value)}
-          style={{ width: 300 }} 
-        />
+        <Space size="middle">
+          {activeTab === 'ledger' && (
+            <DatePicker.RangePicker 
+              onChange={(dates: any) => setDateRange(dates)}
+              allowClear
+              placeholder={['开始日期', '结束日期']}
+            />
+          )}
+          <Input.Search 
+            placeholder="搜索客户/供应商/备注" 
+            allowClear 
+            onSearch={setSearchText}
+            onChange={e => setSearchText(e.target.value)}
+            style={{ width: 300 }} 
+          />
+        </Space>
       </div>
 
       <Card>
@@ -172,13 +181,6 @@ export default function Finance() {
             />
           </Tabs.TabPane>
           <Tabs.TabPane tab="资金流水" key="ledger">
-            <div style={{ marginBottom: 16 }}>
-              <DatePicker.RangePicker 
-                onChange={(dates: any) => setDateRange(dates)}
-                allowClear
-                placeholder={['开始日期', '结束日期']}
-              />
-            </div>
             <Table
               dataSource={getLedgerData()}
               rowKey="id"
