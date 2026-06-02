@@ -659,6 +659,7 @@ exports.main = async (event, context) => {
             )
           `);
           try { await connection.query("ALTER TABLE purchase_orders ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0.00 AFTER total_amount;"); } catch(e){}
+          try { await connection.query("ALTER TABLE purchase_orders ADD COLUMN payment_status VARCHAR(20) DEFAULT 'pending' AFTER status;"); } catch(e){}
           try { await connection.query("ALTER TABLE sales_orders ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0.00 AFTER total_amount;"); } catch(e){}
           return { code: 200, message: 'Migration successful' };
         } finally {
