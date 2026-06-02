@@ -31,12 +31,12 @@ async function logAudit(pool, action, payload) {
   if (action === 'createSalesOrder') message = `提交了新的销售单号: ${payload.id}`;
   if (action === 'updateSalesOrder') message = `更新了销售单: ${payload.id}`;
   if (action === 'deleteSalesOrder') message = `删除了销售单: ${payload.id}`;
-  if (action === 'confirmSalesOrder') message = `确认了销售单出库: ${payload.id}`;
+  if (action === 'confirmSalesShipment') message = `确认了销售单出库: ${payload.id}`;
   
   if (action === 'createPurchaseOrder') message = `提交了新的采购单号: ${payload.id}`;
   if (action === 'updatePurchaseOrder') message = `更新了采购单: ${payload.id}`;
   if (action === 'deletePurchaseOrder') message = `删除了采购单: ${payload.id}`;
-  if (action === 'confirmPurchaseOrder') message = `确认了某笔采购入库: ${payload.id}`;
+  if (action === 'confirmPurchaseReceipt') message = `确认了某笔采购入库: ${payload.id}`;
   
   if (action === 'createProduct') message = `录入了新产品: ${payload.name || payload.id}`;
   if (action === 'updateProduct') message = `修改了产品信息: ${payload.id}`;

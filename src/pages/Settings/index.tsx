@@ -20,6 +20,8 @@ const { Text, Paragraph } = Typography;
 const SettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [productsList, setProductsList] = useState<any[]>([]);
+  const [salesList, setSalesList] = useState<any[]>([]);
+  const [purchaseList, setPurchaseList] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [stats, setStats] = useState({
     products: 0,
@@ -53,6 +55,8 @@ const SettingsPage: React.FC = () => {
         });
         setLogs(auditLogs);
         setProductsList(prods);
+        setSalesList(sales);
+        setPurchaseList(purch);
       } catch (err) {
         console.error(err);
       } finally {
@@ -169,10 +173,12 @@ const SettingsPage: React.FC = () => {
           'updateSalesOrder': '修改销售单',
           'deleteSalesOrder': '删除销售单',
           'confirmSalesOrder': '确认出库',
+          'confirmSalesShipment': '确认出库',
           'createPurchaseOrder': '新建采购单',
           'updatePurchaseOrder': '修改采购单',
           'deletePurchaseOrder': '删除采购单',
           'confirmPurchaseOrder': '确认入库',
+          'confirmPurchaseReceipt': '确认入库',
           'createProduct': '添加产品',
           'updateProduct': '修改产品',
           'deleteProduct': '删除产品',
@@ -196,12 +202,29 @@ const SettingsPage: React.FC = () => {
         // Handle legacy un-translated text
         let displayMsg = text;
         if (text === '执行了操作: adjustInventoryStock') displayMsg = '执行了操作: 库存调整';
+        if (text === '执行了操作: confirmSalesShipment') displayMsg = '执行了操作: 确认销售出库';
+        if (text === '执行了操作: confirmPurchaseReceipt') displayMsg = '执行了操作: 确认采购入库';
         
+        // Also clean up UUID in the original message if it exists
+        if (displayMsg.includes(id)) {
+          displayMsg = displayMsg.replace(id, '');
+        }
+
         let displayId = id;
         if (id) {
           const product = productsList.find(p => p.id === id);
           if (product) {
             displayId = `[${product.code}] ${product.name}`;
+          } else {
+            const sale = salesList.find(s => s.id === id);
+            if (sale) {
+              displayId = `[${sale.orderNumber}]`;
+            } else {
+              const purch = purchaseList.find(p => p.id === id);
+              if (purch) {
+                displayId = `[${purch.orderNumber}]`;
+              }
+            }
           }
         }
         
