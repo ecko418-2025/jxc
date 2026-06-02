@@ -37,15 +37,13 @@ const SettingsPage: React.FC = () => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const [prods, cats, supps, custs, sales, purch, auditLogs] = await Promise.all([
-          productDB.getAll(),
-          categoryDB.getAll(),
-          supplierDB.getAll(),
-          customerDB.getAll(),
-          salesOrderDB.getAll(),
-          purchaseOrderDB.getAll(),
-          auditDB.getList().catch(() => [])
-        ]);
+        const prods = await productDB.getAll().catch(() => []);
+        const cats = await categoryDB.getAll().catch(() => []);
+        const supps = await supplierDB.getAll().catch(() => []);
+        const custs = await customerDB.getAll().catch(() => []);
+        const sales = await salesOrderDB.getAll().catch(() => []);
+        const purch = await purchaseOrderDB.getAll().catch(() => []);
+        const auditLogs = await auditDB.getList().catch(() => []);
         setStats({
           products: prods.length,
           categories: cats.length,
@@ -153,11 +151,17 @@ const SettingsPage: React.FC = () => {
     if (!id) return '';
     const product = productsList.find(p => p.id === id);
     if (product) return `[${product.code}] ${product.name}`;
+    let displayId = id;
     const sale = salesList.find(s => s.id === id);
-    if (sale) return `[${sale.orderNumber}]`;
-    const purch = purchaseList.find(p => p.id === id);
-    if (purch) return `[${purch.orderNumber}]`;
-    return id;
+    if (sale) {
+      displayId = `[${sale.orderNo}]`;
+    } else {
+      const purch = purchaseList.find(p => p.id === id);
+      if (purch) {
+        displayId = `[${purch.orderNo}]`;
+      }
+    }
+    return displayId;
   };
   
   const getActionName = (type: string) => {
