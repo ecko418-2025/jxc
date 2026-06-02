@@ -20,6 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 const { Title, Text } = Typography;
 
 const STORAGE_KEY = 'proposals_draft';
+const TITLE_STORAGE_KEY = 'proposals_title_draft';
 
 interface SelectedItem {
   id: string;
@@ -76,6 +77,7 @@ const ProposalsPage: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [searchValue, setSearchValue] = useState<string | null>(null);
+  const [proposalTitle, setProposalTitle] = useState('投标标书制单');
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   useEffect(() => {
@@ -83,6 +85,9 @@ const ProposalsPage: React.FC = () => {
     // Load draft
     try {
       const draft = localStorage.getItem(STORAGE_KEY);
+      const titleDraft = localStorage.getItem(TITLE_STORAGE_KEY);
+      if (titleDraft) setProposalTitle(titleDraft);
+
       if (draft) {
         const parsed = JSON.parse(draft);
         if (parsed.length > 0 && typeof parsed[0] === 'string') {
@@ -100,6 +105,10 @@ const ProposalsPage: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedItems));
   }, [selectedItems]);
+
+  useEffect(() => {
+    localStorage.setItem(TITLE_STORAGE_KEY, proposalTitle);
+  }, [proposalTitle]);
 
   const loadProducts = async () => {
     setLoading(true);
@@ -204,7 +213,7 @@ const ProposalsPage: React.FC = () => {
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '投标标书清单');
-    XLSX.writeFile(wb, `投标标书_${new Date().getTime()}.xlsx`);
+    XLSX.writeFile(wb, `${proposalTitle}_${new Date().getTime()}.xlsx`);
     message.success('导出成功！已保存为 Excel');
   };
 
@@ -265,7 +274,16 @@ const ProposalsPage: React.FC = () => {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <Title level={4} style={{ margin: 0 }}><FileDoneOutlined /> 投标标书制单</Title>
+        <Space align="center">
+          <FileDoneOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+          <Title
+            level={4}
+            style={{ margin: 0 }}
+            editable={{ onChange: setProposalTitle, tooltip: '点击编辑标书标题' }}
+          >
+            {proposalTitle}
+          </Title>
+        </Space>
         <Space className="hide-on-print">
           <Text type="secondary">
             {selectedItems.length > 0 ? `草稿已自动缓存，共 ${selectedItems.length} 款产品` : '暂无数据'}

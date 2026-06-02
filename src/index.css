@@ -469,3 +469,8 @@ body {
     vertical-align: middle !important;
   }
 }
+@media print {
+  .ant-typography-edit {
+    display: none !important;
+  }
+}
