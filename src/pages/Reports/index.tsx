@@ -3,7 +3,7 @@
 // ========================================
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Table, Typography, Space, Select, Tag, Spin, message } from 'antd';
+import { Card, Row, Col, Statistic, Table, Typography, Space, Select, Tag, Spin, message, DatePicker } from 'antd';
 import {
   DollarOutlined, ShoppingCartOutlined, RiseOutlined,
   ArrowUpOutlined, ArrowDownOutlined,
@@ -15,7 +15,11 @@ const { Text } = Typography;
 
 const ReportsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
+  const [period, setPeriod] = useState<'week' | 'month' | 'quarter' | 'year' | 'custom'>('month');
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>([
+    dayjs().subtract(1, 'month').startOf('day'),
+    dayjs().endOf('day')
+  ]);
   
   const [dataCache, setDataCache] = useState<any>({
     salesOrders: [],
@@ -55,21 +59,46 @@ const ReportsPage: React.FC = () => {
     fetchData();
   }, []);
 
+  const handlePeriodChange = (val: 'week' | 'month' | 'quarter' | 'year' | 'custom') => {
+    setPeriod(val);
+    const now = dayjs();
+    if (val === 'week') {
+      setDateRange([now.subtract(7, 'day').startOf('day'), now.endOf('day')]);
+    } else if (val === 'month') {
+      setDateRange([now.subtract(1, 'month').startOf('day'), now.endOf('day')]);
+    } else if (val === 'quarter') {
+      setDateRange([now.subtract(3, 'month').startOf('day'), now.endOf('day')]);
+    } else if (val === 'year') {
+      setDateRange([now.subtract(1, 'year').startOf('day'), now.endOf('day')]);
+    }
+  };
+
+  const handleRangeChange = (dates: any) => {
+    if (dates) {
+      setDateRange([dates[0], dates[1]]);
+      setPeriod('custom');
+    } else {
+      setDateRange(null);
+      setPeriod('custom');
+    }
+  };
+
   const report = useMemo(() => {
     const { salesOrders, purchaseOrders, products, customers, categories, inventories } = dataCache;
 
-    // Period filter
-    const now = dayjs();
-    let startDate: dayjs.Dayjs;
-    switch (period) {
-      case 'week': startDate = now.subtract(7, 'day'); break;
-      case 'month': startDate = now.subtract(1, 'month'); break;
-      case 'quarter': startDate = now.subtract(3, 'month'); break;
-      case 'year': startDate = now.subtract(1, 'year'); break;
-    }
+    const startDate = dateRange ? dateRange[0].startOf('day') : null;
+    const endDate = dateRange ? dateRange[1].endOf('day') : null;
 
-    const periodSales = salesOrders.filter((o: any) => dayjs(o.orderDate).isAfter(startDate));
-    const periodPurchase = purchaseOrders.filter((o: any) => dayjs(o.orderDate).isAfter(startDate));
+    const periodSales = salesOrders.filter((o: any) => {
+      if (!startDate || !endDate) return true;
+      const od = dayjs(o.orderDate);
+      return od.isAfter(startDate) && od.isBefore(endDate);
+    });
+    const periodPurchase = purchaseOrders.filter((o: any) => {
+      if (!startDate || !endDate) return true;
+      const od = dayjs(o.orderDate);
+      return od.isAfter(startDate) && od.isBefore(endDate);
+    });
 
     const totalSales = periodSales.reduce((sum: number, o: any) => sum + Number(o.totalAmount), 0);
     const totalPurchase = periodPurchase.reduce((sum: number, o: any) => sum + Number(o.totalAmount), 0);
@@ -145,13 +174,14 @@ const ReportsPage: React.FC = () => {
       categoryData,
       inventoryValue,
     };
-  }, [period, dataCache]);
+  }, [dateRange, dataCache]);
 
   const periodLabels: Record<string, string> = {
     week: '近7天',
     month: '近30天',
     quarter: '近3个月',
     year: '近1年',
+    custom: '所选周期',
   };
 
   if (loading) {
@@ -165,14 +195,26 @@ const ReportsPage: React.FC = () => {
   return (
     <div>
       {/* Period selector */}
-      <Space style={{ marginBottom: 20 }}>
-        <Text strong style={{ color: 'var(--text-primary)' }}>统计周期:</Text>
-        <Select value={period} onChange={setPeriod} style={{ width: 120 }}>
-          <Select.Option value="week">近7天</Select.Option>
-          <Select.Option value="month">近30天</Select.Option>
-          <Select.Option value="quarter">近3个月</Select.Option>
-          <Select.Option value="year">近1年</Select.Option>
-        </Select>
+      <Space style={{ marginBottom: 20 }} size="middle">
+        <Space>
+          <Text strong style={{ color: 'var(--text-primary)' }}>统计周期:</Text>
+          <Select value={period} onChange={handlePeriodChange} style={{ width: 120 }}>
+            <Select.Option value="week">近7天</Select.Option>
+            <Select.Option value="month">近30天</Select.Option>
+            <Select.Option value="quarter">近3个月</Select.Option>
+            <Select.Option value="year">近1年</Select.Option>
+            <Select.Option value="custom" disabled={period !== 'custom'}>自定义</Select.Option>
+          </Select>
+        </Space>
+        <Space>
+          <Text strong style={{ color: 'var(--text-primary)' }}>时间范围:</Text>
+          <DatePicker.RangePicker 
+            value={dateRange}
+            onChange={handleRangeChange}
+            allowClear={false}
+            placeholder={['开始日期', '结束日期']}
+          />
+        </Space>
       </Space>
 
       {/* Summary Cards */}
