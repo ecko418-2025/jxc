@@ -3,7 +3,7 @@
 // ========================================
 
 import { useState, useEffect } from 'react';
-import { Table, Card, Typography, Tabs, Tag, message, Button, Input } from 'antd';
+import { Table, Card, Typography, Tabs, Tag, message, Button, Input, DatePicker } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { financeLedgerDB, customerDB, supplierDB, salesOrderDB, purchaseOrderDB } from '../../database/db';
 import type { FinanceLedger, Customer, Supplier, SalesOrder, PurchaseOrder } from '../../database/types';
@@ -22,6 +22,7 @@ export default function Finance() {
   
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
 
   const refreshData = async () => {
     setLoading(true);
@@ -108,8 +109,15 @@ export default function Finance() {
       const party = l.type === 'income' 
         ? customers.find(c => c.id === l.partyId) 
         : suppliers.find(s => s.id === l.partyId);
-      return (party?.name || '').toLowerCase().includes(searchText.toLowerCase()) ||
+      const matchText = (party?.name || '').toLowerCase().includes(searchText.toLowerCase()) ||
              (l.remark || '').toLowerCase().includes(searchText.toLowerCase());
+      
+      let matchDate = true;
+      if (dateRange && dateRange[0] && dateRange[1]) {
+        const pd = dayjs(l.paymentDate);
+        matchDate = pd.isAfter(dateRange[0].startOf('day')) && pd.isBefore(dateRange[1].endOf('day'));
+      }
+      return matchText && matchDate;
     });
   };
 
@@ -164,10 +172,22 @@ export default function Finance() {
             />
           </Tabs.TabPane>
           <Tabs.TabPane tab="资金流水" key="ledger">
+            <div style={{ marginBottom: 16 }}>
+              <DatePicker.RangePicker 
+                onChange={(dates: any) => setDateRange(dates)}
+                allowClear
+                placeholder={['开始日期', '结束日期']}
+              />
+            </div>
             <Table
               dataSource={getLedgerData()}
               rowKey="id"
               loading={loading}
+              pagination={{
+                defaultPageSize: 50,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                showSizeChanger: true
+              }}
               columns={[
                 { title: '日期', dataIndex: 'paymentDate', key: 'paymentDate', render: (v) => dayjs(v).format('YYYY-MM-DD') },
                 { title: '类型', dataIndex: 'type', key: 'type', render: (v) => (
