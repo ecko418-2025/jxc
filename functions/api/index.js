@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 // 数据库连接池
 let pool;
+let currentOperator;
 
 const orderStatusMap = {
   draft: '草稿',
@@ -24,7 +25,7 @@ const paymentStatusMap = {
 
 
 async function logAudit(pool, action, payload) {
-  if (!action || action.startsWith('get') || action === 'migrate') return;
+  if (!action || action.startsWith('get') || action === 'migrate' || action === 'getUserProfile' || action === 'getUserList') return;
 
   let message = `执行了操作: ${action}`;
   
@@ -64,12 +65,13 @@ async function logAudit(pool, action, payload) {
     else message += ` (流水ID: ${payload.id})`;
   }
 
-  const user = '系统管理员';
+  const user = (currentOperator && currentOperator.displayName) || '系统管理员';
+  const operatorUid = (currentOperator && currentOperator.uid) || 'system';
 
   try {
     await pool.query(
-      'INSERT INTO audit_logs (id, user_name, action_type, message, payload) VALUES (?, ?, ?, ?, ?)',
-      [crypto.randomUUID(), user, action, message, JSON.stringify(payload)]
+      'INSERT INTO audit_logs (id, user_name, operator_uid, action_type, message, payload) VALUES (?, ?, ?, ?, ?, ?)',
+      [crypto.randomUUID(), user, operatorUid, action, message, JSON.stringify(payload)]
     );
   } catch (err) {
     console.error('Failed to write audit log:', err);
@@ -95,7 +97,8 @@ exports.main = async (event, context) => {
     });
   }
 
-  const { action, payload } = event;
+  const { action, payload, operator } = event;
+  currentOperator = operator;
   
   if (!action) {
     return { code: 400, message: 'Missing action parameter' };
@@ -122,6 +125,23 @@ exports.main = async (event, context) => {
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
           `);
+        } catch(e){}
+
+        try {
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+              uid VARCHAR(64) PRIMARY KEY,
+              username VARCHAR(100) NOT NULL,
+              display_name VARCHAR(100) NOT NULL,
+              role VARCHAR(20) NOT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+          `);
+        } catch(e){}
+
+        try {
+          await pool.query("ALTER TABLE audit_logs ADD COLUMN operator_uid VARCHAR(64) AFTER user_name;");
         } catch(e){}
 
         try {
@@ -324,7 +344,7 @@ exports.main = async (event, context) => {
             );
           }
         }
-        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'create', '创建了采购单', payload.operator || '系统']);
+        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'create', '创建了采购单', (currentOperator && currentOperator.uid) || 'system']);
         await logAudit(pool, action, payload); return { code: 200, message: 'Success', data: { id } };
       }
       case 'deletePurchaseOrder': {
@@ -335,13 +355,13 @@ exports.main = async (event, context) => {
       case 'updatePurchaseOrderInfo': {
         const { id, extOrderNo, invoiceNo, remark, operator } = payload;
         await pool.query('UPDATE purchase_orders SET ext_order_no = ?, invoice_no = ?, remark = ? WHERE id = ?', [extOrderNo, invoiceNo || '', remark, id]);
-        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'update_info', `修改了订单信息 (发票编号/对方单号/备注)`, operator || '系统']);
+        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'update_info', `修改了订单信息 (发票编号/对方单号/备注)`, (currentOperator && currentOperator.uid) || 'system']);
         await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'updatePurchaseOrder': {
         if (payload.status) {
           await pool.query('UPDATE purchase_orders SET status = ? WHERE id = ?', [payload.status, payload.id]);
-          await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), payload.id, 'purchase', 'update_status', `更新了采购单状态为: ${orderStatusMap[payload.status] || payload.status}`, payload.operator || '系统']);
+          await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), payload.id, 'purchase', 'update_status', `更新了采购单状态为: ${orderStatusMap[payload.status] || payload.status}`, (currentOperator && currentOperator.uid) || 'system']);
         }
         await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
@@ -383,11 +403,11 @@ exports.main = async (event, context) => {
             const logId = crypto.randomUUID();
             await connection.query(
               'INSERT INTO inventory_logs (id, product_id, type, quantity_change, balance, ref_type, ref_id, operator, _openid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [logId, product_id, 'in', quantity, newQty, 'purchase', id, operator || '系统', event.userInfo?.openId || '']
+              [logId, product_id, 'in', quantity, newQty, 'purchase', id, (currentOperator && currentOperator.uid) || 'system', event.userInfo?.openId || '']
             );
           }
           
-          await connection.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'update_status', '确认入库 (更新订单状态为: 已入库)', operator || '系统']);
+          await connection.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'update_status', '确认入库 (更新订单状态为: 已入库)', (currentOperator && currentOperator.uid) || 'system']);
           await connection.commit();
           await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
         } catch (e) {
@@ -432,7 +452,7 @@ exports.main = async (event, context) => {
             );
           }
         }
-        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'create', '创建了销售单', payload.operator || '系统']);
+        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'create', '创建了销售单', (currentOperator && currentOperator.uid) || 'system']);
         await logAudit(pool, action, payload); return { code: 200, message: 'Success', data: { id } };
       }
       case 'deleteSalesOrder': {
@@ -443,7 +463,7 @@ exports.main = async (event, context) => {
       case 'updateSalesOrderInfo': {
         const { id, extOrderNo, invoiceNo, remark, operator } = payload;
         await pool.query('UPDATE sales_orders SET ext_order_no = ?, invoice_no = ?, remark = ? WHERE id = ?', [extOrderNo, invoiceNo || '', remark, id]);
-        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_info', `修改了订单信息 (发票编号/对方单号/备注)`, operator || '系统']);
+        await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_info', `修改了订单信息 (发票编号/对方单号/备注)`, (currentOperator && currentOperator.uid) || 'system']);
         await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'updateSalesOrder': {
@@ -462,10 +482,10 @@ exports.main = async (event, context) => {
           params.push(id);
           await pool.query(`UPDATE sales_orders SET ${updates.join(', ')} WHERE id = ?`, params);
           if (status) {
-            await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_status', `更新了订单状态为: ${orderStatusMap[status] || status}`, payload.operator || '系统']);
+            await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_status', `更新了订单状态为: ${orderStatusMap[status] || status}`, (currentOperator && currentOperator.uid) || 'system']);
           }
           if (paymentStatus) {
-            await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_payment', `更新了收款状态为: ${paymentStatusMap[paymentStatus] || paymentStatus}`, payload.operator || '系统']);
+            await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_payment', `更新了收款状态为: ${paymentStatusMap[paymentStatus] || paymentStatus}`, (currentOperator && currentOperator.uid) || 'system']);
           }
         }
         await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
@@ -509,11 +529,11 @@ exports.main = async (event, context) => {
             const logId = crypto.randomUUID();
             await connection.query(
               'INSERT INTO inventory_logs (id, product_id, type, quantity_change, balance, ref_type, ref_id, operator, _openid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [logId, product_id, 'out', quantity, newQty, 'sales', id, operator || '系统', event.userInfo?.openId || '']
+              [logId, product_id, 'out', quantity, newQty, 'sales', id, (currentOperator && currentOperator.uid) || 'system', event.userInfo?.openId || '']
             );
           }
           
-          await connection.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_status', '确认出库 (更新订单状态为: 已发货)', operator || '系统']);
+          await connection.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_status', '确认出库 (更新订单状态为: 已发货)', (currentOperator && currentOperator.uid) || 'system']);
           await connection.commit();
           await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
         } catch (e) {
@@ -605,6 +625,9 @@ exports.main = async (event, context) => {
         };
       }
       case 'adjustInventoryStock': {
+        if (!currentOperator || (currentOperator.role !== 'admin' && currentOperator.role !== 'warehouse')) {
+          return { code: 403, message: 'Forbidden: Administrator or Warehouse keeper privileges required' };
+        }
         const { productId, newQty, operator } = payload;
         
         // 获取当前库存
@@ -629,7 +652,7 @@ exports.main = async (event, context) => {
           const logId = crypto.randomUUID();
           await connection.query(
             'INSERT INTO inventory_logs (id, product_id, type, quantity_change, balance, ref_type, ref_id, operator, _openid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [logId, productId, 'adjust', diff, newQty, 'adjust', 'manual', operator || '系统', event.userInfo?.openId || '']
+            [logId, productId, 'adjust', diff, newQty, 'adjust', 'manual', (currentOperator && currentOperator.uid) || 'system', event.userInfo?.openId || '']
           );
           
           await connection.commit();
@@ -794,6 +817,97 @@ exports.main = async (event, context) => {
         } finally {
           connection.release();
         }
+      }
+
+      case 'getUserProfile': {
+        const { uid, username, displayName } = payload;
+        if (!uid) return { code: 400, message: 'Missing uid' };
+
+        // 1. Check if users table has any admins/users
+        const [countRows] = await pool.query('SELECT COUNT(*) as count FROM users');
+        const isFirstUser = countRows[0].count === 0;
+
+        if (isFirstUser) {
+          // Auto-insert first user as admin
+          const name = displayName || username?.split('@')[0] || '管理员';
+          await pool.query(
+            'INSERT INTO users (uid, username, display_name, role) VALUES (?, ?, ?, ?)',
+            [uid, username || 'admin', name, 'admin']
+          );
+          return { code: 200, data: { uid, username: username || 'admin', displayName: name, role: 'admin' } };
+        }
+
+        // 2. Fetch user profile
+        const [rows] = await pool.query('SELECT * FROM users WHERE uid = ?', [uid]);
+        if (rows.length > 0) {
+          const user = rows[0];
+          return { code: 200, data: { uid: user.uid, username: user.username, displayName: user.display_name, role: user.role } };
+        }
+
+        // 3. User does not exist, insert as pending
+        const name = displayName || username?.split('@')[0] || '新成员';
+        await pool.query(
+          'INSERT INTO users (uid, username, display_name, role) VALUES (?, ?, ?, ?)',
+          [uid, username || 'user', name, 'pending']
+        );
+        return { code: 200, data: { uid, username: username || 'user', displayName: name, role: 'pending' } };
+      }
+
+      case 'saveUserProfile': {
+        // Admin only check
+        if (!currentOperator || currentOperator.role !== 'admin') {
+          return { code: 403, message: 'Forbidden: Administrator privileges required' };
+        }
+        const { uid, username, displayName, role } = payload;
+        if (!uid || !displayName || !role) {
+          return { code: 400, message: 'Missing required parameters: uid, displayName, role' };
+        }
+
+        const [rows] = await pool.query('SELECT uid FROM users WHERE uid = ?', [uid]);
+        if (rows.length > 0) {
+          await pool.query(
+            'UPDATE users SET display_name = ?, role = ? WHERE uid = ?',
+            [displayName, role, uid]
+          );
+        } else {
+          await pool.query(
+            'INSERT INTO users (uid, username, display_name, role) VALUES (?, ?, ?, ?)',
+            [uid, username || 'user', displayName, role]
+          );
+        }
+        await logAudit(pool, action, payload);
+        return { code: 200, message: 'User profile saved successfully' };
+      }
+
+      case 'getUserList': {
+        // Allow any authorized user
+        if (!currentOperator || currentOperator.role === 'pending') {
+          return { code: 403, message: 'Forbidden: Unauthorized' };
+        }
+        const [rows] = await pool.query('SELECT * FROM users ORDER BY created_at DESC');
+        return { 
+          code: 200, 
+          data: rows.map(r => ({
+            uid: r.uid,
+            username: r.username,
+            displayName: r.display_name,
+            role: r.role,
+            createdAt: r.created_at
+          })) 
+        };
+      }
+
+      case 'deleteUserProfile': {
+        // Admin only check
+        if (!currentOperator || currentOperator.role !== 'admin') {
+          return { code: 403, message: 'Forbidden: Administrator privileges required' };
+        }
+        const { uid } = payload;
+        if (!uid) return { code: 400, message: 'Missing uid' };
+
+        await pool.query('DELETE FROM users WHERE uid = ?', [uid]);
+        await logAudit(pool, action, payload);
+        return { code: 200, message: 'User profile deleted successfully' };
       }
 
       default:

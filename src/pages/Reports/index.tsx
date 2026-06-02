@@ -3,11 +3,12 @@
 // ========================================
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Table, Typography, Space, Select, Tag, Spin, message, DatePicker } from 'antd';
+import { Card, Row, Col, Statistic, Table, Typography, Space, Select, Tag, Spin, DatePicker } from 'antd';
 import {
   DollarOutlined, ShoppingCartOutlined, RiseOutlined,
   ArrowUpOutlined, ArrowDownOutlined,
 } from '@ant-design/icons';
+import { message } from '../../utils/antd';
 import { salesOrderDB, purchaseOrderDB, productDB, customerDB, inventoryDB, categoryDB } from '../../database/db';
 import dayjs from 'dayjs';
 
@@ -187,7 +188,7 @@ const ReportsPage: React.FC = () => {
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin size="large" tip="正在加载报表数据..." />
+        <Spin size="large" description="正在加载报表数据..." />
       </div>
     );
   }
@@ -221,50 +222,38 @@ const ReportsPage: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={6}>
           <Card className="stat-card-green" size="small">
-            <Statistic
-              title={`${periodLabels[period]}销售额`}
+            <Statistic title={`${periodLabels[period]}销售额`}
               value={report.totalSales}
               prefix={<DollarOutlined style={{ color: '#22c55e' }} />}
               precision={2}
-              suffix="元"
-              valueStyle={{ color: '#22c55e', fontWeight: 700 }}
-            />
+              suffix="元" styles={{ content: { color: '#22c55e', fontWeight: 700 } }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card className="stat-card-amber" size="small">
-            <Statistic
-              title={`${periodLabels[period]}采购额`}
+            <Statistic title={`${periodLabels[period]}采购额`}
               value={report.totalPurchase}
               prefix={<ShoppingCartOutlined style={{ color: '#f59e0b' }} />}
               precision={2}
-              suffix="元"
-              valueStyle={{ color: '#f59e0b', fontWeight: 700 }}
-            />
+              suffix="元" styles={{ content: { color: '#f59e0b', fontWeight: 700 } }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card className={report.grossProfit >= 0 ? 'stat-card-blue' : 'stat-card-red'} size="small">
-            <Statistic
-              title="毛利润"
+            <Statistic title="毛利润"
               value={report.grossProfit}
               prefix={report.grossProfit >= 0 ? <ArrowUpOutlined style={{ color: '#3b82f6' }} /> : <ArrowDownOutlined style={{ color: '#ef4444' }} />}
               precision={2}
-              suffix="元"
-              valueStyle={{ color: report.grossProfit >= 0 ? '#3b82f6' : '#ef4444', fontWeight: 700 }}
-            />
+              suffix="元" styles={{ content: { color: report.grossProfit >= 0 ? '#3b82f6' : '#ef4444', fontWeight: 700 } }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card className="stat-card-purple" size="small">
-            <Statistic
-              title="库存总价值"
+            <Statistic title="库存总价值"
               value={report.inventoryValue}
               prefix={<RiseOutlined style={{ color: '#a855f7' }} />}
               precision={2}
-              suffix="元"
-              valueStyle={{ color: '#a855f7', fontWeight: 700 }}
-            />
+              suffix="元" styles={{ content: { color: '#a855f7', fontWeight: 700 } }} />
           </Card>
         </Col>
       </Row>

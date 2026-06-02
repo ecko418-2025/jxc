@@ -4,9 +4,10 @@
 // ========================================
 
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Space, Typography, Popconfirm, message, Upload, Select, Input } from 'antd';
+import { Card, Table, Button, Space, Typography, Popconfirm, Upload, Select, Input } from 'antd';
 import { DownloadOutlined, UploadOutlined, DeleteOutlined, FileDoneOutlined, ArrowUpOutlined, ArrowDownOutlined, MenuOutlined, PrinterOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
+import { message } from '../../utils/antd';
 import { productDB, categoryDB } from '../../database/db';
 import type { Product, Category } from '../../database/types';
 import { CloudImage } from '../../components/CloudImage';

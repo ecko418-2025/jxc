@@ -4,9 +4,9 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  Table, Button, Modal, Form, Input, Select, Card, Space, Tag, message,
-  Popconfirm, Typography, Tooltip,
-} from 'antd';
+  Table, Button, Modal, Form, Input, Select, Card, Space, Tag, 
+  Popconfirm, Typography, Tooltip} from 'antd';
+import { message } from '../../utils/antd';;
 import { PlusOutlined, EditOutlined, DeleteOutlined, PhoneOutlined, CrownOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { customerDB } from '../../database/db';

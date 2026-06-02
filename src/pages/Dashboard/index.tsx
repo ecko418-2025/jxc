@@ -143,7 +143,7 @@ const Dashboard: React.FC = () => {
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin size="large" tip="正在加载看板数据..." />
+        <Spin size="large" description="正在加载看板数据..." />
       </div>
     );
   }
@@ -154,48 +154,36 @@ const Dashboard: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={6}>
           <Card className="stat-card-blue" hoverable onClick={() => navigate('/sales')}>
-            <Statistic
-              title="今日销售额"
+            <Statistic title="今日销售额"
               value={stats.todaySales}
               prefix={<DollarOutlined style={{ color: '#3b82f6' }} />}
               precision={2}
-              suffix="元"
-              valueStyle={{ color: '#3b82f6', fontWeight: 700 }}
-            />
+              suffix="元" styles={{ content: { color: '#3b82f6', fontWeight: 700 } }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card className="stat-card-green" hoverable onClick={() => navigate('/sales')}>
-            <Statistic
-              title="本月销售额"
+            <Statistic title="本月销售额"
               value={stats.monthSales}
               prefix={<RiseOutlined style={{ color: '#22c55e' }} />}
               precision={2}
-              suffix="元"
-              valueStyle={{ color: '#22c55e', fontWeight: 700 }}
-            />
+              suffix="元" styles={{ content: { color: '#22c55e', fontWeight: 700 } }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card className="stat-card-amber" hoverable onClick={() => navigate('/sales')}>
-            <Statistic
-              title="待处理订单"
+            <Statistic title="待处理订单"
               value={stats.pendingOrders}
               prefix={<ShoppingCartOutlined style={{ color: '#f59e0b' }} />}
-              suffix="单"
-              valueStyle={{ color: '#f59e0b', fontWeight: 700 }}
-            />
+              suffix="单" styles={{ content: { color: '#f59e0b', fontWeight: 700 } }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card className="stat-card-red" hoverable onClick={() => navigate('/inventory')}>
-            <Statistic
-              title="库存预警"
+            <Statistic title="库存预警"
               value={stats.lowStockCount}
               prefix={<WarningOutlined style={{ color: '#ef4444' }} />}
-              suffix="项"
-              valueStyle={{ color: '#ef4444', fontWeight: 700 }}
-            />
+              suffix="项" styles={{ content: { color: '#ef4444', fontWeight: 700 } }} />
           </Card>
         </Col>
       </Row>
@@ -204,22 +192,22 @@ const Dashboard: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={12} sm={6}>
           <Card size="small" className="stat-card-purple" hoverable onClick={() => navigate('/products')}>
-            <Statistic title="产品总数" value={stats.totalProducts} prefix={<ShopOutlined style={{ color: '#a855f7' }} />} valueStyle={{ color: '#a855f7', fontSize: 20 }} />
+            <Statistic title="产品总数" value={stats.totalProducts} prefix={<ShopOutlined style={{ color: '#a855f7' }} />} styles={{ content: { color: '#a855f7', fontSize: 20 } }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small" className="stat-card-blue" hoverable onClick={() => navigate('/customers')}>
-            <Statistic title="客户数" value={stats.totalCustomers} valueStyle={{ color: '#3b82f6', fontSize: 20 }} />
+            <Statistic title="客户数" value={stats.totalCustomers} styles={{ content: { color: '#3b82f6', fontSize: 20 } }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small" className="stat-card-green" hoverable onClick={() => navigate('/suppliers')}>
-            <Statistic title="供应商" value={stats.totalSuppliers} valueStyle={{ color: '#22c55e', fontSize: 20 }} />
+            <Statistic title="供应商" value={stats.totalSuppliers} styles={{ content: { color: '#22c55e', fontSize: 20 } }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small" className="stat-card-amber" hoverable onClick={() => navigate('/purchase')}>
-            <Statistic title="待采购" value={stats.pendingPurchase} suffix="单" valueStyle={{ color: '#f59e0b', fontSize: 20 }} />
+            <Statistic title="待采购" value={stats.pendingPurchase} suffix="单" styles={{ content: { color: '#f59e0b', fontSize: 20 } }} />
           </Card>
         </Col>
       </Row>

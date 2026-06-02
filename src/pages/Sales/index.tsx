@@ -5,14 +5,15 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber, Select, Space, Tag,
-  Card, message, DatePicker, Popconfirm, Typography, Row, Col, Divider, Drawer, Timeline
+  Card,  DatePicker, Popconfirm, Typography, Row, Col, Divider, Drawer, Timeline
 } from 'antd';
+import { message } from '../../utils/antd';;
 import {
   PlusOutlined, DeleteOutlined, CheckOutlined, SendOutlined,
   EyeOutlined, DollarOutlined, PrinterOutlined
 } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
-import { salesOrderDB, customerDB, productDB, inventoryDB, financeLedgerDB, getCurrentUser } from '../../database/db';
+import { salesOrderDB, customerDB, productDB, inventoryDB, financeLedgerDB, getCurrentUser, userDB } from '../../database/db';
 import type { SalesOrder, SalesItem, Customer, Product, InventoryRecord, FinanceLedger } from '../../database/types';
 import { CloudImage } from '../../components/CloudImage';
 import { printOrder } from '../../utils/print';
@@ -24,8 +25,10 @@ const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const SalesPage: React.FC = () => {
+  const role = localStorage.getItem('user_role') || 'pending';
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<SalesOrder[]>([]);
+  const [userMap, setUserMap] = useState<Record<string, { displayName: string; role: string }>>({});
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [inventories, setInventories] = useState<InventoryRecord[]>([]);
@@ -87,16 +90,18 @@ const SalesPage: React.FC = () => {
   const refreshData = useCallback(async () => {
     try {
       setLoading(true);
-      const [oData, cData, pData, iData] = await Promise.all([
+      const [oData, cData, pData, iData, uMap] = await Promise.all([
         salesOrderDB.getAll(),
         customerDB.getAll(),
         productDB.getAll(),
         inventoryDB.getAll(),
+        userDB.getUserMap(),
       ]);
       setOrders(oData);
       setCustomers(cData);
       setProducts(pData);
       setInventories(iData);
+      setUserMap(uMap);
     } catch (error: any) {
       message.error(error.message || '加载失败');
     } finally {
@@ -345,18 +350,18 @@ const SalesPage: React.FC = () => {
             loadOrderLedgers(record.id);
             setLedgerModalOpen(true);
           }}>资金明细</Button>
-          {record.status === 'draft' && (
+          {role !== 'warehouse' && role !== 'finance' && record.status === 'draft' && (
             <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => handleConfirm(record.id)}>确认</Button>
           )}
-          {record.status === 'confirmed' && (
+          {role !== 'sales' && role !== 'finance' && record.status === 'confirmed' && (
             <Button size="small" style={{ background: '#f59e0b', borderColor: '#f59e0b', color: '#fff' }}
               icon={<SendOutlined />} onClick={() => handleShip(record.id)}>发货</Button>
           )}
-          {record.status === 'shipped' && (
+          {role !== 'sales' && role !== 'finance' && record.status === 'shipped' && (
             <Button size="small" style={{ background: '#22c55e', borderColor: '#22c55e', color: '#fff' }}
               icon={<DollarOutlined />} onClick={() => handleComplete(record.id)}>完成</Button>
           )}
-          {record.status !== 'cancelled' && record.status !== 'completed' && record.paymentStatus !== 'paid' && (
+          {role !== 'warehouse' && role !== 'finance' && record.status !== 'cancelled' && record.status !== 'completed' && record.paymentStatus !== 'paid' && (
             <Select
               size="small"
               value={record.paymentStatus}
@@ -369,7 +374,7 @@ const SalesPage: React.FC = () => {
               ]}
             />
           )}
-          {(record.status === 'draft' || record.status === 'confirmed') && (
+          {role !== 'warehouse' && role !== 'finance' && (record.status === 'draft' || record.status === 'confirmed') && (
             <Popconfirm title="确定取消?" onConfirm={() => handleCancel(record)}>
               <Button size="small" danger>取消</Button>
             </Popconfirm>
@@ -383,14 +388,16 @@ const SalesPage: React.FC = () => {
     <Card size="small">
       <Space style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
         <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-            form.resetFields();
-            form.setFieldsValue({ orderDate: dayjs(), discount: 0 });
-            setItems([]);
-            setModalOpen(true);
-          }}>
-            新建销售单
-          </Button>
+          {role !== 'warehouse' && role !== 'finance' && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+              form.resetFields();
+              form.setFieldsValue({ orderDate: dayjs(), discount: 0 });
+              setItems([]);
+              setModalOpen(true);
+            }}>
+              新建销售单
+            </Button>
+          )}
         </Space>
         <Space>
           <RangePicker 
@@ -704,7 +711,15 @@ const SalesPage: React.FC = () => {
                     return map[v] || v;
                   } },
                   { title: '备注', dataIndex: 'remark' },
-                  { title: '经办人', dataIndex: 'createdBy' },
+                  { title: '经办人', dataIndex: 'createdBy', render: (v) => {
+                    const info = userMap[v];
+                    if (info) {
+                      const roleText = info.role === 'admin' ? '管理员' : info.role === 'finance' ? '财务' : info.role === 'sales' ? '销售' : info.role === 'warehouse' ? '库管' : info.role;
+                      return `${info.displayName} (${roleText})`;
+                    }
+                    if (v === 'system' || v === '系统') return '系统自动';
+                    return v;
+                  } },
                 ]}
               />
             </div>
@@ -775,7 +790,7 @@ const SalesPage: React.FC = () => {
         placement="right"
         onClose={() => setTimelineVisible(false)}
         open={timelineVisible}
-        width={400}
+        size={400}
       >
         <Timeline
           pending={timelineLoading ? '加载中...' : false}
@@ -788,7 +803,19 @@ const SalesPage: React.FC = () => {
                 </div>
                 <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
                   <Space>
-                    <span>{log.operator}</span>
+                    <span>
+                      {(() => {
+                        const info = userMap[log.operator];
+                        if (info) {
+                          const roleText = info.role === 'admin' ? '管理员' : info.role === 'finance' ? '财务' : info.role === 'sales' ? '销售' : info.role === 'warehouse' ? '库管' : info.role;
+                          return `${info.displayName} (${roleText})`;
+                        }
+                        if (log.operator === 'system' || log.operator === '系统') {
+                          return '系统自动';
+                        }
+                        return log.operator;
+                      })()}
+                    </span>
                     <span>{dayjs(log.created_at).format('YYYY-MM-DD HH:mm:ss')}</span>
                   </Space>
                 </div>
@@ -852,7 +879,15 @@ const SalesPage: React.FC = () => {
               return map[v] || v;
             } },
             { title: '备注', dataIndex: 'remark' },
-            { title: '经办人', dataIndex: 'createdBy' },
+            { title: '经办人', dataIndex: 'createdBy', render: (v) => {
+              const info = userMap[v];
+              if (info) {
+                const roleText = info.role === 'admin' ? '管理员' : info.role === 'finance' ? '财务' : info.role === 'sales' ? '销售' : info.role === 'warehouse' ? '库管' : info.role;
+                return `${info.displayName} (${roleText})`;
+              }
+              if (v === 'system' || v === '系统') return '系统自动';
+              return v;
+            } },
           ]}
         />
       </Modal>

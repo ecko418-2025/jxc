@@ -3,10 +3,11 @@
 // ========================================
 
 import { useState, useEffect } from 'react';
-import { Table, Card, Typography, Tabs, Tag, message, Button, Input, DatePicker, Space, Modal } from 'antd';
+import { Table, Card, Typography, Tabs, Tag, Button, Input, DatePicker, Space, Modal } from 'antd';
 import { DeleteOutlined, DownloadOutlined, PrinterOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { financeLedgerDB, customerDB, supplierDB, salesOrderDB, purchaseOrderDB } from '../../database/db';
+import { message } from '../../utils/antd';
+import { financeLedgerDB, customerDB, supplierDB, salesOrderDB, purchaseOrderDB, userDB } from '../../database/db';
 import type { FinanceLedger, Customer, Supplier, SalesOrder, PurchaseOrder } from '../../database/types';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
@@ -26,6 +27,7 @@ export default function Finance() {
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+  const [userMap, setUserMap] = useState<Record<string, { displayName: string; role: string }>>({});
 
   const [statementModalOpen, setStatementModalOpen] = useState(false);
   const [selectedParty, setSelectedParty] = useState<Customer | Supplier | null>(null);
@@ -38,18 +40,20 @@ export default function Finance() {
   const refreshData = async () => {
     setLoading(true);
     try {
-      const [l, c, s, so, po] = await Promise.all([
+      const [l, c, s, so, po, uMap] = await Promise.all([
         financeLedgerDB.getAll(),
         customerDB.getAll(),
         supplierDB.getAll(),
         salesOrderDB.getAll(),
-        purchaseOrderDB.getAll()
+        purchaseOrderDB.getAll(),
+        userDB.getUserMap(),
       ]);
       setLedgers(l);
       setCustomers(c);
       setSuppliers(s);
       setSalesOrders(so);
       setPurchaseOrders(po);
+      setUserMap(uMap);
     } catch (e: any) {
       message.error('加载财务数据失败: ' + e.message);
     } finally {
@@ -206,10 +210,11 @@ export default function Finance() {
     timelineItems.sort((a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf());
 
     let currentBalance = openingBalance;
-    const items = timelineItems.map(item => {
+    const items = timelineItems.map((item, idx) => {
       currentBalance += item.amount;
       return {
         ...item,
+        key: `${item.docNo}-${idx}-${item.date}`,
         balance: currentBalance
       };
     });
@@ -418,7 +423,15 @@ export default function Finance() {
         '金额': `${l.type === 'income' ? '+' : '-'}${Number(l.amount).toFixed(2)}`,
         '支付方式': payMethodMap[l.paymentMethod] || l.paymentMethod || '',
         '备注': l.remark || '',
-        '经办人': l.createdBy || '',
+        '经办人': (() => {
+          const info = userMap[l.createdBy || ''];
+          if (info) {
+            const roleText = info.role === 'admin' ? '管理员' : info.role === 'finance' ? '财务' : info.role === 'sales' ? '销售' : info.role === 'warehouse' ? '库管' : info.role;
+            return `${info.displayName} (${roleText})`;
+          }
+          if (l.createdBy === 'system' || l.createdBy === '系统') return '系统自动';
+          return l.createdBy || '';
+        })(),
       };
     });
   };
@@ -505,119 +518,143 @@ export default function Finance() {
       </div>
 
       <Card>
-        <Tabs activeKey={activeTab} onChange={setActiveTab}>
-          <Tabs.TabPane tab="应收账款 (客户)" key="receivable">
-            <Table
-              dataSource={getARData()}
-              rowKey="id"
-              loading={loading}
-              columns={[
-                { title: '客户名称', dataIndex: 'name', key: 'name', render: (t) => (
-                  <Button type="link" style={{ padding: 0, fontWeight: 'bold' }} onClick={() => navigate(`/sales?search=${encodeURIComponent(t)}`)}>
-                    {t}
-                  </Button>
-                ) },
-                { title: '联系人', dataIndex: 'contact', key: 'contact' },
-                { title: '有效单据数', dataIndex: 'ordersCount', key: 'ordersCount' },
-                { title: '历史总订货额', dataIndex: 'totalOrdered', key: 'totalOrdered', render: (v) => `¥${Number(v).toFixed(2)}` },
-                { title: '历史总已收款', dataIndex: 'totalPaid', key: 'totalPaid', render: (v) => <Text type="success">¥{Number(v).toFixed(2)}</Text> },
-                { title: '当前欠款', dataIndex: 'balance', key: 'balance', render: (v, record) => (
-                  <Text strong type={v > 0 ? 'danger' : 'secondary'} style={{ color: v > (record.creditLimit || 9999999) ? '#dc2626' : undefined }}>
-                    ¥{Number(v).toFixed(2)}
-                  </Text>
-                ) },
-                { title: '信用额度', dataIndex: 'creditLimit', key: 'creditLimit', render: (v) => v ? `¥${v}` : '无限制' },
-                { title: '操作', key: 'action', render: (_, r) => (
-                  <Button size="small" type="link" style={{ padding: 0 }} onClick={() => { setSelectedParty(r); setPartyType('receivable'); setStatementModalOpen(true); }}>
-                    对账单
-                  </Button>
-                ) }
-              ]}
-            />
-          </Tabs.TabPane>
-          <Tabs.TabPane tab="应付账款 (供应商)" key="payable">
-            <Table
-              dataSource={getAPData()}
-              rowKey="id"
-              loading={loading}
-              columns={[
-                { title: '供应商名称', dataIndex: 'name', key: 'name', render: (t) => (
-                  <Button type="link" style={{ padding: 0, fontWeight: 'bold' }} onClick={() => navigate(`/purchase?search=${encodeURIComponent(t)}`)}>
-                    {t}
-                  </Button>
-                ) },
-                { title: '联系人', dataIndex: 'contact', key: 'contact' },
-                { title: '有效采购单数', dataIndex: 'ordersCount', key: 'ordersCount' },
-                { title: '历史总采购额', dataIndex: 'totalOrdered', key: 'totalOrdered', render: (v) => `¥${Number(v).toFixed(2)}` },
-                { title: '历史总已付款', dataIndex: 'totalPaid', key: 'totalPaid', render: (v) => <Text type="warning">¥{Number(v).toFixed(2)}</Text> },
-                { title: '当前欠款', dataIndex: 'balance', key: 'balance', render: (v) => <Text strong type={v > 0 ? 'danger' : 'secondary'}>¥{Number(v).toFixed(2)}</Text> },
-                { title: '操作', key: 'action', render: (_, r) => (
-                  <Button size="small" type="link" style={{ padding: 0 }} onClick={() => { setSelectedParty(r); setPartyType('payable'); setStatementModalOpen(true); }}>
-                    对账单
-                  </Button>
-                ) }
-              ]}
-            />
-          </Tabs.TabPane>
-          <Tabs.TabPane tab="资金流水" key="ledger">
-            <Table
-              dataSource={getLedgerData()}
-              rowKey="id"
-              loading={loading}
-              pagination={{
-                defaultPageSize: 50,
-                pageSizeOptions: ['10', '20', '50', '100'],
-                showSizeChanger: true
-              }}
-              columns={[
-                { title: '日期', dataIndex: 'paymentDate', key: 'paymentDate', render: (v) => dayjs(v).format('YYYY-MM-DD') },
-                { title: '类型', dataIndex: 'type', key: 'type', render: (v) => (
-                  <Tag color={v === 'income' ? 'green' : 'orange'}>{v === 'income' ? '收款 (应收)' : '付款 (应付)'}</Tag>
-                ) },
-                { title: '关联客商', dataIndex: 'partyId', key: 'partyId', render: (v, r) => {
-                  if (r.type === 'income') {
-                    const name = customers.find(c => c.id === v)?.name;
-                    if (!name) return '未知客户';
-                    return (
-                      <Button type="link" style={{ padding: 0 }} onClick={() => navigate(`/sales?search=${encodeURIComponent(name)}`)}>
-                        {name}
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={[
+            {
+              label: '应收账款 (客户)',
+              key: 'receivable',
+              children: (
+                <Table
+                  dataSource={getARData()}
+                  rowKey="id"
+                  loading={loading}
+                  columns={[
+                    { title: '客户名称', dataIndex: 'name', key: 'name', render: (t) => (
+                      <Button type="link" style={{ padding: 0, fontWeight: 'bold' }} onClick={() => navigate(`/sales?search=${encodeURIComponent(t)}`)}>
+                        {t}
                       </Button>
-                    );
-                  } else {
-                    const name = suppliers.find(s => s.id === v)?.name;
-                    if (!name) return '未知供应商';
-                    return (
-                      <Button type="link" style={{ padding: 0 }} onClick={() => navigate(`/purchase?search=${encodeURIComponent(name)}`)}>
-                        {name}
+                    ) },
+                    { title: '联系人', dataIndex: 'contact', key: 'contact' },
+                    { title: '有效单据数', dataIndex: 'ordersCount', key: 'ordersCount' },
+                    { title: '历史总订货额', dataIndex: 'totalOrdered', key: 'totalOrdered', render: (v) => `¥${Number(v).toFixed(2)}` },
+                    { title: '历史总已收款', dataIndex: 'totalPaid', key: 'totalPaid', render: (v) => <Text type="success">¥{Number(v).toFixed(2)}</Text> },
+                    { title: '当前欠款', dataIndex: 'balance', key: 'balance', render: (v, record) => (
+                      <Text strong type={v > 0 ? 'danger' : 'secondary'} style={{ color: v > (record.creditLimit || 9999999) ? '#dc2626' : undefined }}>
+                        ¥{Number(v).toFixed(2)}
+                      </Text>
+                    ) },
+                    { title: '信用额度', dataIndex: 'creditLimit', key: 'creditLimit', render: (v) => v ? `¥${v}` : '无限制' },
+                    { title: '操作', key: 'action', render: (_, r) => (
+                      <Button size="small" type="link" style={{ padding: 0 }} onClick={() => { setSelectedParty(r); setPartyType('receivable'); setStatementModalOpen(true); }}>
+                        对账单
                       </Button>
-                    );
-                  }
-                } },
-                { title: '关联订单', dataIndex: 'orderId', key: 'orderId', render: (v, r) => {
-                  if (!v) return '—';
-                  if (r.type === 'income') return salesOrders.find(o => o.id === v)?.orderNo || v;
-                  return purchaseOrders.find(o => o.id === v)?.orderNo || v;
-                } },
-                { title: '金额', dataIndex: 'amount', key: 'amount', render: (v, r) => (
-                  <Text strong style={{ color: r.type === 'income' ? '#22c55e' : '#f59e0b' }}>
-                    {r.type === 'income' ? '+' : '-'}¥{Number(v).toFixed(2)}
-                  </Text>
-                ) },
-                { title: '支付方式', dataIndex: 'paymentMethod', key: 'paymentMethod', render: (v) => {
-                  const map: any = { wechat: '微信', alipay: '支付宝', bank: '银行转账', cash: '现金' };
-                  return map[v] || v;
-                } },
-                { title: '备注', dataIndex: 'remark', key: 'remark' },
-                { title: '经办人', dataIndex: 'createdBy', key: 'createdBy' },
-                { title: '操作', key: 'action', render: (_, r) => (
-                  <Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => handleDeleteLedger(r.id)}>
-                    撤销
-                  </Button>
-                ) },
-              ]}
-            />
-          </Tabs.TabPane>
-        </Tabs>
+                    ) }
+                  ]}
+                />
+              )
+            },
+            {
+              label: '应付账款 (供应商)',
+              key: 'payable',
+              children: (
+                <Table
+                  dataSource={getAPData()}
+                  rowKey="id"
+                  loading={loading}
+                  columns={[
+                    { title: '供应商名称', dataIndex: 'name', key: 'name', render: (t) => (
+                      <Button type="link" style={{ padding: 0, fontWeight: 'bold' }} onClick={() => navigate(`/purchase?search=${encodeURIComponent(t)}`)}>
+                        {t}
+                      </Button>
+                    ) },
+                    { title: '联系人', dataIndex: 'contact', key: 'contact' },
+                    { title: '有效采购单数', dataIndex: 'ordersCount', key: 'ordersCount' },
+                    { title: '历史总采购额', dataIndex: 'totalOrdered', key: 'totalOrdered', render: (v) => `¥${Number(v).toFixed(2)}` },
+                    { title: '历史总已付款', dataIndex: 'totalPaid', key: 'totalPaid', render: (v) => <Text type="warning">¥{Number(v).toFixed(2)}</Text> },
+                    { title: '当前欠款', dataIndex: 'balance', key: 'balance', render: (v) => <Text strong type={v > 0 ? 'danger' : 'secondary'}>¥{Number(v).toFixed(2)}</Text> },
+                    { title: '操作', key: 'action', render: (_, r) => (
+                      <Button size="small" type="link" style={{ padding: 0 }} onClick={() => { setSelectedParty(r); setPartyType('payable'); setStatementModalOpen(true); }}>
+                        对账单
+                      </Button>
+                    ) }
+                  ]}
+                />
+              )
+            },
+            {
+              label: '资金流水',
+              key: 'ledger',
+              children: (
+                <Table
+                  dataSource={getLedgerData()}
+                  rowKey="id"
+                  loading={loading}
+                  pagination={{
+                    defaultPageSize: 50,
+                    pageSizeOptions: ['10', '20', '50', '100'],
+                    showSizeChanger: true
+                  }}
+                  columns={[
+                    { title: '日期', dataIndex: 'paymentDate', key: 'paymentDate', render: (v) => dayjs(v).format('YYYY-MM-DD') },
+                    { title: '类型', dataIndex: 'type', key: 'type', render: (v) => (
+                      <Tag color={v === 'income' ? 'green' : 'orange'}>{v === 'income' ? '收款 (应收)' : '付款 (应付)'}</Tag>
+                    ) },
+                    { title: '关联客商', dataIndex: 'partyId', key: 'partyId', render: (v, r) => {
+                      if (r.type === 'income') {
+                        const name = customers.find(c => c.id === v)?.name;
+                        if (!name) return '未知客户';
+                        return (
+                          <Button type="link" style={{ padding: 0 }} onClick={() => navigate(`/sales?search=${encodeURIComponent(name)}`)}>
+                            {name}
+                          </Button>
+                        );
+                      } else {
+                        const name = suppliers.find(s => s.id === v)?.name;
+                        if (!name) return '未知供应商';
+                        return (
+                          <Button type="link" style={{ padding: 0 }} onClick={() => navigate(`/purchase?search=${encodeURIComponent(name)}`)}>
+                            {name}
+                          </Button>
+                        );
+                      }
+                    } },
+                    { title: '关联订单', dataIndex: 'orderId', key: 'orderId', render: (v, r) => {
+                      if (!v) return '—';
+                      if (r.type === 'income') return salesOrders.find(o => o.id === v)?.orderNo || v;
+                      return purchaseOrders.find(o => o.id === v)?.orderNo || v;
+                    } },
+                    { title: '金额', dataIndex: 'amount', key: 'amount', render: (v, r) => (
+                      <Text strong style={{ color: r.type === 'income' ? '#22c55e' : '#f59e0b' }}>
+                        {r.type === 'income' ? '+' : '-'}¥{Number(v).toFixed(2)}
+                      </Text>
+                    ) },
+                    { title: '支付方式', dataIndex: 'paymentMethod', key: 'paymentMethod', render: (v) => {
+                      const map: any = { wechat: '微信', alipay: '支付宝', bank: '银行转账', cash: '现金' };
+                      return map[v] || v;
+                    } },
+                    { title: '备注', dataIndex: 'remark', key: 'remark' },
+                    { title: '经办人', dataIndex: 'createdBy', key: 'createdBy', render: (v) => {
+                      const info = userMap[v];
+                      if (info) {
+                        const roleText = info.role === 'admin' ? '管理员' : info.role === 'finance' ? '财务' : info.role === 'sales' ? '销售' : info.role === 'warehouse' ? '库管' : info.role;
+                        return `${info.displayName} (${roleText})`;
+                      }
+                      if (v === 'system' || v === '系统') return '系统自动';
+                      return v;
+                    } },
+                    { title: '操作', key: 'action', render: (_, r) => (
+                      <Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => handleDeleteLedger(r.id)}>
+                        撤销
+                      </Button>
+                    ) },
+                  ]}
+                />
+              )
+            }
+          ]}
+        />
       </Card>
 
       {/* 对账单 Modal */}
@@ -683,6 +720,7 @@ export default function Finance() {
               <Table
                 dataSource={[
                   {
+                    key: 'opening',
                     date: statementDateRange ? statementDateRange[0].format('YYYY-MM-DD') : '',
                     type: '期初余额',
                     docNo: '—',
@@ -704,7 +742,7 @@ export default function Finance() {
                   { title: '应收/应付余额', dataIndex: 'balance', key: 'balance', render: (v) => <strong>¥{v.toFixed(2)}</strong> },
                   { title: '备注', dataIndex: 'remark', key: 'remark' },
                 ]}
-                rowKey={(r, idx) => `${r.docNo}-${idx}`}
+                rowKey="key"
                 pagination={{ defaultPageSize: 10, showSizeChanger: true }}
                 size="small"
               />

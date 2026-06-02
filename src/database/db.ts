@@ -23,15 +23,21 @@ export const auth = app.auth({ persistence: 'local' });
 // ========================
 export let isCloudDbReady = false;
 
-export const getCurrentUser = () => {
-  if (!auth.currentUser) return '系统';
-  return auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || '系统管理员';
+export const getCurrentUser = (): string => {
+  if (!auth.currentUser) return 'system';
+  return auth.currentUser.uid || 'system';
 };
 
-// 应用启动时不再需要预加载全量数据到内存，因为改为了实时异步请求
+// 应用启动时自动触发后端数据库升级迁移
 export const initCloudBase = async () => {
   isCloudDbReady = true;
   console.log('✅ CloudBase SQL API Ready');
+  try {
+    await callApi('migrate');
+    console.log('✅ MySQL Database Schema Migrations Completed');
+  } catch (e) {
+    console.error('❌ Migration failed:', e);
+  }
 };
 
 /**
@@ -39,9 +45,17 @@ export const initCloudBase = async () => {
  */
 async function callApi(action: string, payload: any = {}): Promise<any> {
   try {
+    const currentUser = auth.currentUser;
+    const role = localStorage.getItem('user_role') || 'pending';
+    const operator = currentUser ? {
+      uid: currentUser.uid,
+      displayName: currentUser.displayName || currentUser.email?.split('@')[0] || '未知账户',
+      role
+    } : undefined;
+
     const res = await app.callFunction({
       name: 'api',
-      data: { action, payload }
+      data: { action, payload, operator }
     });
     
     // 云函数返回结构通常是 res.result
@@ -262,3 +276,50 @@ export const financeLedgerDB = {
   },
 };
 
+// ========================
+// User Roles & Profiles
+// ========================
+let cachedUserMap: Record<string, { displayName: string; role: string }> | null = null;
+
+export const userDB = {
+  async getProfile(uid: string, username?: string, displayName?: string) {
+    const res = await callApi('getUserProfile', { uid, username, displayName });
+    return res.data;
+  },
+  async saveProfile(uid: string, displayName: string, role: string, username?: string) {
+    await callApi('saveUserProfile', { uid, displayName, role, username });
+    cachedUserMap = null;
+  },
+  async getList() {
+    const res = await callApi('getUserList');
+    return res.data || [];
+  },
+  async deleteProfile(uid: string) {
+    await callApi('deleteUserProfile', { uid });
+    cachedUserMap = null;
+  },
+  async getUserMap(forceRefresh = false): Promise<Record<string, { displayName: string; role: string }>> {
+    if (cachedUserMap && !forceRefresh) {
+      return cachedUserMap;
+    }
+    try {
+      const list = await this.getList();
+      const map: Record<string, { displayName: string; role: string }> = {};
+      list.forEach((u: any) => {
+        const info = {
+          displayName: u.displayName || u.username || u.uid,
+          role: u.role
+        };
+        map[u.uid] = info;
+        if (u.username) {
+          map[u.username] = info;
+        }
+      });
+      cachedUserMap = map;
+      return map;
+    } catch (e) {
+      console.error('Failed to load user map:', e);
+      return cachedUserMap || {};
+    }
+  }
+};

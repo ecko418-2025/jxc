@@ -3,9 +3,10 @@
 // ========================================
 
 import React, { useState } from 'react';
-import { Card, Form, Input, Button, Typography, message } from 'antd';
+import { Card, Form, Input, Button, Typography } from 'antd';
 import { UserOutlined, LockOutlined, ShopOutlined } from '@ant-design/icons';
 import { auth } from '../../database/db';
+import { message } from '../../utils/antd';
 
 const { Title, Text } = Typography;
 

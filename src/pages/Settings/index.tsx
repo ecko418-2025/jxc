@@ -3,14 +3,15 @@
 // ========================================
 
 import React, { useState, useEffect } from 'react';
-import { Card, Typography, Row, Col, Statistic, Button, message, Space, Upload, Alert, Modal, Spin, Table, Tag, Input } from 'antd';
+import { Card, Typography, Row, Col, Statistic, Button, message, Space, Upload, Alert, Modal, Spin, Table, Tag, Input, Form, Select, Popconfirm } from 'antd';
 import {
   DownloadOutlined, UploadOutlined, DeleteOutlined,
   DatabaseOutlined, ExclamationCircleOutlined,
   CloudDownloadOutlined, CloudUploadOutlined,
   InfoCircleOutlined,
+  TeamOutlined, EditOutlined, PlusOutlined
 } from '@ant-design/icons';
-import { productDB, categoryDB, supplierDB, customerDB, salesOrderDB, purchaseOrderDB, auditDB } from '../../database/db';
+import { productDB, categoryDB, supplierDB, customerDB, salesOrderDB, purchaseOrderDB, auditDB, userDB } from '../../database/db';
 import { seedDemoData } from '../../database/seed';
 import { exportAllToExcel, restoreFromExcel } from '../../utils/excel';
 import dayjs from 'dayjs';
@@ -18,6 +19,7 @@ import dayjs from 'dayjs';
 const { Text, Paragraph } = Typography;
 
 const SettingsPage: React.FC = () => {
+  const role = localStorage.getItem('user_role') || 'pending';
   const [loading, setLoading] = useState(true);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [salesList, setSalesList] = useState<any[]>([]);
@@ -32,6 +34,143 @@ const SettingsPage: React.FC = () => {
     salesOrders: 0,
     purchaseOrders: 0,
   });
+
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [userLoading, setUserLoading] = useState(false);
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [userForm] = Form.useForm();
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+
+  const fetchUsers = async () => {
+    if (role !== 'admin') return;
+    try {
+      setUserLoading(true);
+      const list = await userDB.getList();
+      setUsersList(list);
+    } catch (e) {
+      console.error('获取成员列表失败:', e);
+    } finally {
+      setUserLoading(false);
+    }
+  };
+
+  const handleAddUser = () => {
+    setEditingUser(null);
+    userForm.resetFields();
+    userForm.setFieldsValue({ role: 'pending' });
+    setUserModalOpen(true);
+  };
+
+  const handleEditUser = (record: any) => {
+    setEditingUser(record);
+    userForm.setFieldsValue({
+      uid: record.uid,
+      username: record.username,
+      displayName: record.displayName,
+      role: record.role,
+    });
+    setUserModalOpen(true);
+  };
+
+  const handleSaveUser = async () => {
+    try {
+      const values = await userForm.validateFields();
+      setUserLoading(true);
+      await userDB.saveProfile(values.uid, values.displayName, values.role, values.username || 'user');
+      message.success(editingUser ? '成员权限已更新' : '已添加成员授权');
+      setUserModalOpen(false);
+      fetchUsers();
+    } catch (e: any) {
+      if (e.errorFields) return;
+      message.error('保存失败: ' + (e.message || '未知错误'));
+    } finally {
+      setUserLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (uid: string) => {
+    try {
+      setUserLoading(true);
+      await userDB.deleteProfile(uid);
+      message.success('已取消授权，该账号状态已重置');
+      fetchUsers();
+    } catch (e: any) {
+      message.error('删除失败: ' + (e.message || ''));
+    } finally {
+      setUserLoading(false);
+    }
+  };
+
+  const userRoleMap: Record<string, { color: string; label: string }> = {
+    admin: { color: 'red', label: '系统管理员' },
+    sales: { color: 'blue', label: '销售员' },
+    warehouse: { color: 'orange', label: '库管员' },
+    finance: { color: 'green', label: '财务员' },
+    pending: { color: 'default', label: '待授权' },
+  };
+
+  const userColumns = [
+    {
+      title: '唯一 UID',
+      dataIndex: 'uid',
+      key: 'uid',
+      width: 200,
+      render: (text: string) => <Text style={{ fontFamily: 'monospace' }}>{text}</Text>,
+    },
+    {
+      title: '登录账号',
+      dataIndex: 'username',
+      key: 'username',
+      width: 180,
+    },
+    {
+      title: '显示姓名',
+      dataIndex: 'displayName',
+      key: 'displayName',
+      width: 150,
+      render: (text: string) => <Text strong>{text}</Text>,
+    },
+    {
+      title: '系统角色',
+      dataIndex: 'role',
+      key: 'role',
+      width: 120,
+      render: (roleVal: string) => {
+        const item = userRoleMap[roleVal] || { color: 'default', label: roleVal };
+        return <Tag color={item.color}>{item.label}</Tag>;
+      },
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 160,
+      render: (text: string) => text ? dayjs(text).format('YYYY-MM-DD HH:mm') : '—',
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 150,
+      render: (_: any, record: any) => (
+        <Space>
+          <Button size="small" icon={<EditOutlined />} onClick={() => handleEditUser(record)}>
+            编辑
+          </Button>
+          <Popconfirm
+            title="确认取消该用户的系统授权？"
+            description="取消后，该用户下次登录将重新进入待授权拦截页面。"
+            onConfirm={() => handleDeleteUser(record.uid)}
+            okText="确认"
+            cancelText="取消"
+          >
+            <Button size="small" danger icon={<DeleteOutlined />}>
+              取消授权
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -63,6 +202,7 @@ const SettingsPage: React.FC = () => {
       }
     };
     fetchStats();
+    fetchUsers();
   }, []);
 
   // Backup data
@@ -193,8 +333,17 @@ const SettingsPage: React.FC = () => {
     if (!searchText) return true;
     const lowerSearch = searchText.toLowerCase();
     
-    // Check user
+    // Check user (including resolved name)
+    const uid = log.operator_uid || log.user_name;
+    const matchedUser = usersList.find(u => u.uid === uid || u.username === uid);
+    if (matchedUser) {
+      if (matchedUser.displayName.toLowerCase().includes(lowerSearch)) return true;
+      const roleText = userRoleMap[matchedUser.role]?.label || matchedUser.role;
+      if (roleText.toLowerCase().includes(lowerSearch)) return true;
+    }
+    
     if (log.user_name && log.user_name.toLowerCase().includes(lowerSearch)) return true;
+    if (log.operator_uid && log.operator_uid.toLowerCase().includes(lowerSearch)) return true;
     
     // Check action
     if (getActionName(log.action_type).toLowerCase().includes(lowerSearch)) return true;
@@ -222,10 +371,36 @@ const SettingsPage: React.FC = () => {
     },
     {
       title: '操作人',
-      dataIndex: 'user_name',
-      key: 'user_name',
-      width: 150,
-      render: (text: string) => <Tag color="blue">{text}</Tag>
+      key: 'operator',
+      width: 180,
+      render: (_: any, record: any) => {
+        const uid = record.operator_uid || record.user_name;
+        // 优先在成员列表中匹配
+        const matchedUser = usersList.find(u => u.uid === uid || u.username === uid);
+        if (matchedUser) {
+          const roleLabel = userRoleMap[matchedUser.role]?.label || matchedUser.role;
+          const roleColor = userRoleMap[matchedUser.role]?.color || 'blue';
+          return (
+            <Space size={8}>
+              <Text strong>{matchedUser.displayName}</Text>
+              <Tag color={roleColor} style={{ fontSize: 10, margin: 0 }}>{roleLabel}</Tag>
+            </Space>
+          );
+        }
+        
+        // 系统级自动任务
+        if (uid === 'system') {
+          return <Tag color="gold">系统自动</Tag>;
+        }
+
+        // 如果是有效名字而不是 ID
+        if (record.user_name && record.user_name !== '未知账户' && !/^[a-zA-Z0-9_-]{15,40}$/.test(record.user_name)) {
+          return <Text strong>{record.user_name}</Text>;
+        }
+
+        // 兜底显示 ID/账号
+        return <Text code style={{ fontSize: 11 }}>{uid || '未知操作员'}</Text>;
+      }
     },
     {
       title: '操作动作',
@@ -254,7 +429,7 @@ const SettingsPage: React.FC = () => {
 
         const displayId = getDisplayId(id);
         return (
-          <Space direction="vertical" size="small">
+          <Space orientation="vertical" size="small">
             <Text strong>{displayMsg}</Text>
             {id && (
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -270,7 +445,7 @@ const SettingsPage: React.FC = () => {
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin size="large" tip="正在加载系统状态..." />
+        <Spin size="large" description="正在加载系统状态..." />
       </div>
     );
   }
@@ -283,22 +458,22 @@ const SettingsPage: React.FC = () => {
           <Card title={<Space><DatabaseOutlined /> 数据概览</Space>} size="small">
             <Row gutter={16}>
               <Col xs={8} sm={4}>
-                <Statistic title="品类" value={stats.categories} valueStyle={{ fontSize: 20, color: 'var(--text-accent)' }} />
+                <Statistic title="品类" value={stats.categories} styles={{ content: { fontSize: 20, color: 'var(--text-accent)' } }} />
               </Col>
               <Col xs={8} sm={4}>
-                <Statistic title="产品" value={stats.products} valueStyle={{ fontSize: 20, color: 'var(--text-accent)' }} />
+                <Statistic title="产品" value={stats.products} styles={{ content: { fontSize: 20, color: 'var(--text-accent)' } }} />
               </Col>
               <Col xs={8} sm={4}>
-                <Statistic title="供应商" value={stats.suppliers} valueStyle={{ fontSize: 20, color: 'var(--text-accent)' }} />
+                <Statistic title="供应商" value={stats.suppliers} styles={{ content: { fontSize: 20, color: 'var(--text-accent)' } }} />
               </Col>
               <Col xs={8} sm={4}>
-                <Statistic title="客户" value={stats.customers} valueStyle={{ fontSize: 20, color: 'var(--text-accent)' }} />
+                <Statistic title="客户" value={stats.customers} styles={{ content: { fontSize: 20, color: 'var(--text-accent)' } }} />
               </Col>
               <Col xs={8} sm={4}>
-                <Statistic title="采购单" value={stats.purchaseOrders} valueStyle={{ fontSize: 20, color: 'var(--text-accent)' }} />
+                <Statistic title="采购单" value={stats.purchaseOrders} styles={{ content: { fontSize: 20, color: 'var(--text-accent)' } }} />
               </Col>
               <Col xs={8} sm={4}>
-                <Statistic title="销售单" value={stats.salesOrders} valueStyle={{ fontSize: 20, color: 'var(--text-accent)' }} />
+                <Statistic title="销售单" value={stats.salesOrders} styles={{ content: { fontSize: 20, color: 'var(--text-accent)' } }} />
               </Col>
             </Row>
           </Card>
@@ -353,7 +528,7 @@ const SettingsPage: React.FC = () => {
             style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}
           >
             <Alert
-              message="清空所有数据将不可恢复"
+              title="清空所有数据将不可恢复"
               description="云端 SQL 架构下禁止前端任意清库，若要重置系统，请从腾讯云后台重装数据库实例。"
               type="error"
               style={{ marginBottom: 16 }}
@@ -365,6 +540,32 @@ const SettingsPage: React.FC = () => {
         </Col>
 
 
+        {/* Member Permissions Management */}
+        {role === 'admin' && (
+          <Col xs={24}>
+            <Card
+              title={<Space><TeamOutlined style={{ color: '#6366f1' }} /> 成员权限管理</Space>}
+              size="small"
+              extra={
+                <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddUser}>
+                  添加授权
+                </Button>
+              }
+              style={{ borderColor: 'rgba(99, 102, 241, 0.3)' }}
+            >
+              <Table
+                dataSource={usersList}
+                columns={userColumns}
+                rowKey="uid"
+                pagination={{ defaultPageSize: 10 }}
+                scroll={{ x: 800 }}
+                size="small"
+                loading={userLoading}
+              />
+            </Card>
+          </Col>
+        )}
+
         {/* System Security Log */}
         <Col xs={24}>
           <Card 
@@ -373,7 +574,7 @@ const SettingsPage: React.FC = () => {
             style={{ borderColor: 'rgba(16, 185, 129, 0.3)' }}
           >
             <Alert
-              message="日志自动记录所有的核心写入操作，用于后续安全审计和行为追溯。"
+              title="日志自动记录所有的核心写入操作，用于后续安全审计和行为追溯。"
               type="info"
               showIcon
               style={{ marginBottom: 16 }}
@@ -407,6 +608,54 @@ const SettingsPage: React.FC = () => {
           </Text>
         </div>
       </Card>
+
+      {/* User Edit Modal */}
+      <Modal
+        title={editingUser ? '编辑成员授权' : '添加成员授权'}
+        open={userModalOpen}
+        onOk={handleSaveUser}
+        onCancel={() => setUserModalOpen(false)}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={userLoading}
+      >
+        <Form form={userForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item
+            name="uid"
+            label="用户唯一 UID"
+            rules={[{ required: true, message: '请输入用户的唯一 UID' }]}
+          >
+            <Input placeholder="可让用户从待授权页面复制并提供" disabled={!!editingUser} />
+          </Form.Item>
+          <Form.Item
+            name="username"
+            label="登录账号(邮箱/用户名)"
+            rules={[{ required: true, message: '请输入登录账号' }]}
+          >
+            <Input placeholder="例如: lisi@ecko.com" disabled={!!editingUser} />
+          </Form.Item>
+          <Form.Item
+            name="displayName"
+            label="显示姓名"
+            rules={[{ required: true, message: '请输入姓名' }]}
+          >
+            <Input placeholder="员工真实姓名，将用于安全日志追溯" />
+          </Form.Item>
+          <Form.Item
+            name="role"
+            label="系统角色"
+            rules={[{ required: true, message: '请选择角色' }]}
+          >
+            <Select>
+              <Select.Option value="admin">系统管理员</Select.Option>
+              <Select.Option value="sales">销售员</Select.Option>
+              <Select.Option value="warehouse">库管员</Select.Option>
+              <Select.Option value="finance">财务员</Select.Option>
+              <Select.Option value="pending">待授权</Select.Option>
+            </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

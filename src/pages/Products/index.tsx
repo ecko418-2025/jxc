@@ -28,6 +28,7 @@ const { Search } = Input;
 const { Text } = Typography;
 
 const ProductsPage: React.FC = () => {
+  const role = localStorage.getItem('user_role') || 'pending';
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -101,6 +102,19 @@ const ProductsPage: React.FC = () => {
     try {
       const values = await productForm.validateFields();
       const productData = { ...values, imageUrl: currentImageUrl };
+      if (role === 'sales') {
+        delete productData.purchasePrice;
+        if (!editingProduct) {
+          productData.purchasePrice = 0;
+        }
+      } else if (role === 'warehouse') {
+        delete productData.purchasePrice;
+        delete productData.salePrice;
+        if (!editingProduct) {
+          productData.purchasePrice = 0;
+          productData.salePrice = 0;
+        }
+      }
       if (editingProduct) {
         await productDB.update(editingProduct.id, productData);
         message.success('产品已更新');
@@ -324,20 +338,20 @@ const ProductsPage: React.FC = () => {
       width: 80,
       sorter: (a: Product, b: Product) => (a.brand || '').localeCompare(b.brand || '') 
     },
-    {
+    ...(role !== 'sales' && role !== 'warehouse' ? [{
       title: '采购价',
       dataIndex: 'purchasePrice',
       width: 90,
       sorter: (a: Product, b: Product) => Number(a.purchasePrice) - Number(b.purchasePrice),
       render: (v: number) => <Text style={{ color: 'var(--text-secondary)' }}>¥{Number(v).toFixed(2)}</Text>,
-    },
-    {
+    }] : []),
+    ...(role !== 'warehouse' ? [{
       title: '销售价',
       dataIndex: 'salePrice',
       width: 90,
       sorter: (a: Product, b: Product) => Number(a.salePrice) - Number(b.salePrice),
       render: (v: number) => <Text style={{ color: '#22c55e' }}>¥{Number(v).toFixed(2)}</Text>,
-    },
+    }] : []),
     {
       title: '库存',
       width: 80,
@@ -366,7 +380,7 @@ const ProductsPage: React.FC = () => {
         <Tag color={active ? 'success' : 'default'}>{active ? '启用' : '停用'}</Tag>
       ),
     },
-    {
+    ...(role !== 'warehouse' && role !== 'finance' ? [{
       title: '操作',
       width: 100,
       render: (_: unknown, record: Product) => (
@@ -381,7 +395,7 @@ const ProductsPage: React.FC = () => {
           </Popconfirm>
         </Space>
       ),
-    },
+    }] : []),
   ];
 
   // Category table columns
@@ -404,7 +418,7 @@ const ProductsPage: React.FC = () => {
       width: 80,
       render: (_: unknown, record: Category) => products.filter(p => p.categoryId === record.id).length,
     },
-    {
+    ...(role !== 'warehouse' && role !== 'finance' ? [{
       title: '操作',
       width: 100,
       render: (_: unknown, record: Category) => (
@@ -415,13 +429,13 @@ const ProductsPage: React.FC = () => {
           </Popconfirm>
         </Space>
       ),
-    },
+    }] : []),
   ];
 
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin size="large" tip="正在加载数据..." />
+        <Spin size="large" description="正在加载数据..." />
       </div>
     );
   }
@@ -443,16 +457,18 @@ const ProductsPage: React.FC = () => {
                     title="产品品类"
                     size="small"
                     extra={
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<PlusOutlined />}
-                        onClick={() => {
-                          setEditingCategory(null);
-                          categoryForm.resetFields();
-                          setCategoryModalOpen(true);
-                        }}
-                      />
+                      role !== 'warehouse' && role !== 'finance' && (
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<PlusOutlined />}
+                          onClick={() => {
+                            setEditingCategory(null);
+                            categoryForm.resetFields();
+                            setCategoryModalOpen(true);
+                          }}
+                        />
+                      )
                     }
                   >
                     <div style={{ marginBottom: 8 }}>
@@ -493,32 +509,38 @@ const ProductsPage: React.FC = () => {
                           onSearch={setSearchText}
                           onChange={e => !e.target.value && setSearchText('')}
                         />
-                        <Button
-                          type="primary"
-                          icon={<PlusOutlined />}
-                          onClick={() => {
-                            setEditingProduct(null);
-                            productForm.resetFields();
-                            productForm.setFieldsValue({ active: true, minStock: 10 });
-                            setProductModalOpen(true);
-                          }}
-                        >
-                          新增产品
-                        </Button>
+                        {role !== 'warehouse' && role !== 'finance' && (
+                          <Button
+                            type="primary"
+                            icon={<PlusOutlined />}
+                            onClick={() => {
+                              setEditingProduct(null);
+                              productForm.resetFields();
+                              productForm.setFieldsValue({ active: true, minStock: 10 });
+                              setProductModalOpen(true);
+                            }}
+                          >
+                            新增产品
+                          </Button>
+                        )}
                       </Space>
                       <Space>
-                        <Button
-                          icon={<UploadOutlined />}
-                          onClick={() => { setImportType('product'); setImportModalOpen(true); }}
-                        >
-                          Excel导入
-                        </Button>
-                        <Button
-                          icon={<PictureOutlined />}
-                          onClick={() => { setBulkUploadList([]); setBulkImageModalOpen(true); }}
-                        >
-                          批量导入图片
-                        </Button>
+                        {role !== 'warehouse' && role !== 'finance' && (
+                          <>
+                            <Button
+                              icon={<UploadOutlined />}
+                              onClick={() => { setImportType('product'); setImportModalOpen(true); }}
+                            >
+                              Excel导入
+                            </Button>
+                            <Button
+                              icon={<PictureOutlined />}
+                              onClick={() => { setBulkUploadList([]); setBulkImageModalOpen(true); }}
+                            >
+                              批量导入图片
+                            </Button>
+                          </>
+                        )}
                         <Button icon={<DownloadOutlined />} onClick={() => exportProducts()}>
                           导出
                         </Button>
@@ -537,7 +559,7 @@ const ProductsPage: React.FC = () => {
               </Row>
             ),
           },
-          {
+          ...(role !== 'warehouse' && role !== 'finance' ? [{
             key: 'categories',
             label: <Space><AppstoreOutlined />品类管理</Space>,
             children: (
@@ -574,7 +596,7 @@ const ProductsPage: React.FC = () => {
                 />
               </Card>
             ),
-          },
+          }] : []),
         ]}
       />
 
@@ -639,16 +661,20 @@ const ProductsPage: React.FC = () => {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item name="purchasePrice" label="采购价(¥)" rules={[{ required: true }]}>
-                <InputNumber min={0} precision={2} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="salePrice" label="销售价(¥)" rules={[{ required: true }]}>
-                <InputNumber min={0} precision={2} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
+            {role !== 'sales' && role !== 'warehouse' && (
+              <Col span={8}>
+                <Form.Item name="purchasePrice" label="采购价(¥)" rules={[{ required: true }]}>
+                  <InputNumber min={0} precision={2} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            )}
+            {role !== 'warehouse' && (
+              <Col span={8}>
+                <Form.Item name="salePrice" label="销售价(¥)" rules={[{ required: true }]}>
+                  <InputNumber min={0} precision={2} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            )}
             <Col span={8}>
               <Form.Item name="active" label="状态" valuePropName="checked">
                 <Switch checkedChildren="启用" unCheckedChildren="停用" />
@@ -739,7 +765,7 @@ const ProductsPage: React.FC = () => {
       >
         <div style={{ marginTop: 16 }}>
           <Alert
-            message="导入说明"
+            title="导入说明"
             description={
               <ul style={{ paddingLeft: 16, margin: '8px 0 0' }}>
                 <li>请先下载模板，按模板格式填写数据</li>
@@ -801,7 +827,7 @@ const ProductsPage: React.FC = () => {
       >
         <div style={{ marginTop: 16 }}>
           <Alert
-            message="导入说明"
+            title="导入说明"
             description={
               <ul style={{ paddingLeft: 16, margin: '8px 0 0' }}>
                 <li>图片文件名应为产品的<strong>产品编码</strong>（如 <code>P-0001.jpg</code> 或 <code>P-0002.png</code>）。</li>

@@ -46,10 +46,45 @@ const AppLayout: React.FC = () => {
   const location = useLocation();
   const [lowStockCount, setLowStockCount] = useState(0);
 
+  const role = localStorage.getItem('user_role') || 'pending';
+  const displayName = auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || '系统成员';
+
+  const roleLabelMap: Record<string, string> = {
+    admin: '系统管理员',
+    sales: '销售员',
+    warehouse: '库管员',
+    finance: '财务员',
+    pending: '待授权'
+  };
+  const roleLabel = roleLabelMap[role] || '成员';
+
+  const filteredMenuItems = menuItems.filter(item => {
+    if (role === 'admin') return true;
+    if (role === 'sales') {
+      return !['/reports', '/finance', '/settings'].includes(item.key);
+    }
+    if (role === 'warehouse') {
+      return ['/', '/products', '/purchase', '/sales', '/inventory'].includes(item.key);
+    }
+    if (role === 'finance') {
+      return !['/proposals', '/settings'].includes(item.key);
+    }
+    return false;
+  });
+
+  const isPathAllowed = filteredMenuItems.some(m => m.key === location.pathname);
+
   React.useEffect(() => {
     inventoryDB.getLowStockProducts().then(res => setLowStockCount(res.length)).catch(() => {});
   }, [location.pathname]);
+
   const currentTitle = menuItems.find(m => m.key === location.pathname)?.label || '数据看板';
+
+  const dropdownItems = [
+    ...(role === 'admin' ? [{ key: 'settings', label: '系统设置', onClick: () => navigate('/settings') }] : []),
+    ...(role === 'admin' ? [{ type: 'divider' as const }] : []),
+    { key: 'logout', label: '退出登录', danger: true, onClick: async () => { await auth.signOut(); window.location.reload(); } }
+  ];
 
   return (
     <Layout style={{ height: '100vh' }}>
@@ -109,7 +144,7 @@ const AppLayout: React.FC = () => {
           mode="inline"
           selectedKeys={[location.pathname]}
           onClick={({ key }) => navigate(key)}
-          items={menuItems.map(item => ({
+          items={filteredMenuItems.map(item => ({
             ...item,
             label: item.key === '/inventory' ? (
               <Space>
@@ -147,14 +182,21 @@ const AppLayout: React.FC = () => {
           </Space>
 
           <Space size={20}>
-            <Tooltip title={lowStockCount > 0 ? `${lowStockCount} 个产品库存不足，点击查看` : '库存正常，点击前往库存管理'}>
-              <Badge count={lowStockCount} size="small" offset={[-2, 2]}>
-                <BellOutlined 
-                  style={{ fontSize: 18, color: 'var(--text-secondary)', cursor: 'pointer', transition: 'color 0.3s' }} 
-                  onClick={() => navigate('/inventory')}
-                />
-              </Badge>
-            </Tooltip>
+            <div style={{ display: collapsed ? 'none' : 'flex', alignItems: 'center', gap: '8px' }}>
+              <Text strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{displayName}</Text>
+              <span style={{ fontSize: 11, color: '#6366f1', background: 'rgba(99, 102, 241, 0.1)', padding: '2px 8px', borderRadius: '4px', fontWeight: 500 }}>{roleLabel}</span>
+            </div>
+
+            {role !== 'warehouse' && (
+              <Tooltip title={lowStockCount > 0 ? `${lowStockCount} 个产品库存不足，点击查看` : '库存正常，点击前往库存管理'}>
+                <Badge count={lowStockCount} size="small" offset={[-2, 2]}>
+                  <BellOutlined 
+                    style={{ fontSize: 18, color: 'var(--text-secondary)', cursor: 'pointer', transition: 'color 0.3s' }} 
+                    onClick={() => navigate('/inventory')}
+                  />
+                </Badge>
+              </Tooltip>
+            )}
             
             <Tooltip title="安全退出">
               <LogoutOutlined 
@@ -165,15 +207,9 @@ const AppLayout: React.FC = () => {
                 }}
               />
             </Tooltip>
-
+ 
             <Dropdown
-              menu={{
-                items: [
-                  { key: 'settings', label: '系统设置', onClick: () => navigate('/settings') },
-                  { type: 'divider' },
-                  { key: 'logout', label: '退出登录', danger: true, onClick: async () => { await auth.signOut(); window.location.reload(); } }
-                ]
-              }}
+              menu={{ items: dropdownItems }}
               placement="bottomRight"
             >
               <Avatar
@@ -184,12 +220,12 @@ const AppLayout: React.FC = () => {
                   fontSize: 14,
                 }}
               >
-                管
+                {displayName.charAt(0)}
               </Avatar>
             </Dropdown>
           </Space>
         </Header>
-
+ 
         {/* Page Content */}
         <Content style={{
           padding: 24,
@@ -197,7 +233,21 @@ const AppLayout: React.FC = () => {
           background: 'var(--bg-primary)',
         }}>
           <div className="animate-fade-in-up">
-            <Outlet />
+            {isPathAllowed ? (
+              <Outlet />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '100px 24px' }}>
+                <h1 style={{ color: '#ef4444', fontSize: 40, marginBottom: 16 }}>403</h1>
+                <h2 style={{ color: 'var(--text-primary)', marginBottom: 12 }}>抱歉，您无权访问此页面</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 24 }}>您的当前岗位角色没有该模块的查看权限，如有疑问请联系系统管理员。</p>
+                <button 
+                  onClick={() => navigate('/')}
+                  style={{ background: '#6366f1', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold' }}
+                >
+                  返回看板
+                </button>
+              </div>
+            )}
           </div>
         </Content>
       </Layout>

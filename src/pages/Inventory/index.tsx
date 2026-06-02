@@ -5,8 +5,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Table, Card, Tag, Typography, Space, Badge, InputNumber, Button,
-  Modal, Tabs, message, Progress, Input,
-} from 'antd';
+  Modal, Tabs,  Progress, Input} from 'antd';
+import { message } from '../../utils/antd';;
 import {
   WarningOutlined, CheckCircleOutlined, EditOutlined,
   HistoryOutlined, AlertOutlined,
@@ -21,6 +21,7 @@ const { Search } = Input;
 
 
 const InventoryPage: React.FC = () => {
+  const role = localStorage.getItem('user_role') || 'pending';
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -183,9 +184,11 @@ const InventoryPage: React.FC = () => {
       width: 140,
       render: (_: unknown, record: any) => (
         <Space>
-          <Button size="small" icon={<EditOutlined />} onClick={() => handleAdjust(record)}>
-            调整
-          </Button>
+          {role !== 'sales' && role !== 'finance' && (
+            <Button size="small" icon={<EditOutlined />} onClick={() => handleAdjust(record)}>
+              调整
+            </Button>
+          )}
           <Button size="small" icon={<HistoryOutlined />} onClick={() => showLogs(record)}>
             流水
           </Button>

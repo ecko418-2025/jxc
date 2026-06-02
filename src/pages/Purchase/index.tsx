@@ -5,14 +5,15 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber, Select, Space, Tag,
-  Card, message, DatePicker, Popconfirm, Typography, Row, Col, Divider, Drawer, Timeline
+  Card,  DatePicker, Popconfirm, Typography, Row, Col, Divider, Drawer, Timeline
 } from 'antd';
+import { message } from '../../utils/antd';;
 import {
   PlusOutlined, DeleteOutlined, CheckOutlined, InboxOutlined,
   EyeOutlined, PrinterOutlined
 } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
-import { purchaseOrderDB, supplierDB, productDB, inventoryDB, financeLedgerDB, getCurrentUser } from '../../database/db';
+import { purchaseOrderDB, supplierDB, productDB, inventoryDB, financeLedgerDB, getCurrentUser, userDB } from '../../database/db';
 import type { PurchaseOrder, PurchaseItem, Supplier, Product, FinanceLedger } from '../../database/types';
 import { CloudImage } from '../../components/CloudImage';
 import { printOrder } from '../../utils/print';
@@ -24,8 +25,10 @@ const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const PurchasePage: React.FC = () => {
+  const role = localStorage.getItem('user_role') || 'pending';
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [userMap, setUserMap] = useState<Record<string, { displayName: string; role: string }>>({});
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [inventories, setInventories] = useState<any[]>([]);
@@ -87,16 +90,18 @@ const PurchasePage: React.FC = () => {
   const refreshData = useCallback(async () => {
     try {
       setLoading(true);
-      const [oData, sData, pData, iData] = await Promise.all([
+      const [oData, sData, pData, iData, uMap] = await Promise.all([
         purchaseOrderDB.getAll(),
         supplierDB.getAll(),
         productDB.getAll(),
         inventoryDB.getAll(),
+        userDB.getUserMap(),
       ]);
       setOrders(oData);
       setSuppliers(sData);
       setProducts(pData);
       setInventories(iData);
+      setUserMap(uMap);
     } catch (error: any) {
       message.error(error.message || '加载失败');
     } finally {
@@ -304,18 +309,18 @@ const PurchasePage: React.FC = () => {
             loadOrderLedgers(record.id);
             setLedgerModalOpen(true);
           }}>资金明细</Button>
-          {record.status === 'draft' && (
+          {role !== 'warehouse' && role !== 'finance' && record.status === 'draft' && (
             <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => handleConfirm(record.id)}>
               确认
             </Button>
           )}
-          {record.status === 'confirmed' && (
+          {role !== 'sales' && role !== 'finance' && record.status === 'confirmed' && (
             <Button size="small" style={{ background: '#22c55e', borderColor: '#22c55e', color: '#fff' }}
               icon={<InboxOutlined />} onClick={() => handleReceive(record.id)}>
               入库
             </Button>
           )}
-          {(record.status === 'draft' || record.status === 'confirmed') && (
+          {role !== 'warehouse' && role !== 'finance' && (record.status === 'draft' || record.status === 'confirmed') && (
             <Popconfirm title="确定取消?" onConfirm={() => handleCancel(record)}>
               <Button size="small" danger>取消</Button>
             </Popconfirm>
@@ -329,14 +334,16 @@ const PurchasePage: React.FC = () => {
     <Card size="small">
       <Space style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
         <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-            form.resetFields();
-            form.setFieldsValue({ orderDate: dayjs() });
-            setItems([]);
-            setModalOpen(true);
-          }}>
-            新建采购单
-          </Button>
+          {role !== 'warehouse' && role !== 'finance' && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+              form.resetFields();
+              form.setFieldsValue({ orderDate: dayjs() });
+              setItems([]);
+              setModalOpen(true);
+            }}>
+              新建采购单
+            </Button>
+          )}
         </Space>
         <Space>
           <RangePicker 
@@ -572,7 +579,7 @@ const PurchasePage: React.FC = () => {
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <Text strong>附加信息</Text>
-                {!editingInfo ? (
+                {role !== 'warehouse' && role !== 'finance' && (!editingInfo ? (
                   <Button size="small" type="dashed" onClick={() => {
                     infoForm.setFieldsValue({ extOrderNo: detailOrder.extOrderNo, invoiceNo: detailOrder.invoiceNo, remark: detailOrder.remark });
                     setEditingInfo(true);
@@ -582,7 +589,7 @@ const PurchasePage: React.FC = () => {
                     <Button size="small" onClick={() => setEditingInfo(false)}>取消</Button>
                     <Button size="small" type="primary" onClick={handleUpdateInfo}>保存</Button>
                   </Space>
-                )}
+                ))}
               </div>
               
               {!editingInfo ? (
@@ -617,15 +624,17 @@ const PurchasePage: React.FC = () => {
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <Text strong>付款明细</Text>
-                <Button size="small" type="primary" onClick={() => {
-                  const balance = detailOrder.totalAmount - (detailOrder.paidAmount || 0);
-                  paymentForm.setFieldsValue({
-                    amount: balance > 0 ? balance : 0,
-                    paymentDate: dayjs(),
-                    paymentMethod: 'bank'
-                  });
-                  setPaymentModalOpen(true);
-                }}>录入付款</Button>
+                {(role === 'admin' || role === 'finance') && detailOrder.status !== 'draft' && detailOrder.status !== 'cancelled' && detailOrder.paymentStatus !== 'paid' && (
+                  <Button size="small" type="primary" onClick={() => {
+                    const balance = detailOrder.totalAmount - (detailOrder.paidAmount || 0);
+                    paymentForm.setFieldsValue({
+                      amount: balance > 0 ? balance : 0,
+                      paymentDate: dayjs(),
+                      paymentMethod: 'bank'
+                    });
+                    setPaymentModalOpen(true);
+                  }}>录入付款</Button>
+                )}
               </div>
               <Table
                 dataSource={orderLedgers}
@@ -640,7 +649,15 @@ const PurchasePage: React.FC = () => {
                     return map[v] || v;
                   } },
                   { title: '备注', dataIndex: 'remark' },
-                  { title: '经办人', dataIndex: 'createdBy' },
+                  { title: '经办人', dataIndex: 'createdBy', render: (v) => {
+                    const info = userMap[v];
+                    if (info) {
+                      const roleText = info.role === 'admin' ? '管理员' : info.role === 'finance' ? '财务' : info.role === 'sales' ? '销售' : info.role === 'warehouse' ? '库管' : info.role;
+                      return `${info.displayName} (${roleText})`;
+                    }
+                    if (v === 'system' || v === '系统') return '系统自动';
+                    return v;
+                  } },
                 ]}
               />
             </div>
@@ -711,7 +728,7 @@ const PurchasePage: React.FC = () => {
         placement="right"
         onClose={() => setTimelineVisible(false)}
         open={timelineVisible}
-        width={400}
+        size={400}
       >
         <Timeline
           pending={timelineLoading ? '加载中...' : false}
@@ -724,7 +741,19 @@ const PurchasePage: React.FC = () => {
                 </div>
                 <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
                   <Space>
-                    <span>{log.operator}</span>
+                    <span>
+                      {(() => {
+                        const info = userMap[log.operator];
+                        if (info) {
+                          const roleText = info.role === 'admin' ? '管理员' : info.role === 'finance' ? '财务' : info.role === 'sales' ? '销售' : info.role === 'warehouse' ? '库管' : info.role;
+                          return `${info.displayName} (${roleText})`;
+                        }
+                        if (log.operator === 'system' || log.operator === '系统') {
+                          return '系统自动';
+                        }
+                        return log.operator;
+                      })()}
+                    </span>
                     <span>{dayjs(log.created_at).format('YYYY-MM-DD HH:mm:ss')}</span>
                   </Space>
                 </div>
@@ -745,7 +774,7 @@ const PurchasePage: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', paddingRight: 32 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontSize: 16, fontWeight: 500 }}>付款明细 - {currentLedgerOrder?.orderNo}</span>
-              {currentLedgerOrder && (
+              {(role === 'admin' || role === 'finance') && currentLedgerOrder && currentLedgerOrder.status !== 'draft' && currentLedgerOrder.status !== 'cancelled' && currentLedgerOrder.paymentStatus !== 'paid' && (
                 <Button size="small" type="primary" onClick={() => {
                   const balance = currentLedgerOrder.totalAmount - (currentLedgerOrder.paidAmount || 0);
                   paymentForm.setFieldsValue({
@@ -788,7 +817,15 @@ const PurchasePage: React.FC = () => {
               return map[v] || v;
             } },
             { title: '备注', dataIndex: 'remark' },
-            { title: '经办人', dataIndex: 'createdBy' },
+            { title: '经办人', dataIndex: 'createdBy', render: (v) => {
+              const info = userMap[v];
+              if (info) {
+                const roleText = info.role === 'admin' ? '管理员' : info.role === 'finance' ? '财务' : info.role === 'sales' ? '销售' : info.role === 'warehouse' ? '库管' : info.role;
+                return `${info.displayName} (${roleText})`;
+              }
+              if (v === 'system' || v === '系统') return '系统自动';
+              return v;
+            } },
           ]}
         />
       </Modal>
