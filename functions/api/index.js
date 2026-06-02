@@ -54,8 +54,15 @@ async function logAudit(pool, action, payload) {
   if (action === 'createFinanceLedger') {
     const isIncome = payload.type === 'income';
     message = `确认了一笔 ${payload.amount} 元的${isIncome ? '收款' : '付款'}`;
+    if (payload.orderNo) message += ` (关联单据: ${payload.orderNo})`;
   }
-  if (action === 'deleteFinanceLedger') message = `删除了财务流水: ${payload.id}`;
+  if (action === 'deleteFinanceLedger') {
+    message = `删除了财务流水`;
+    if (payload.amount) message += ` (${payload.amount}元)`;
+    if (payload.orderNo) message += ` (关联单据: ${payload.orderNo})`;
+    else if (payload.orderId) message += ` (关联单据: ${payload.orderId})`;
+    else message += ` (流水ID: ${payload.id})`;
+  }
 
   const user = '系统管理员';
 
@@ -705,6 +712,8 @@ exports.main = async (event, context) => {
 
           if (orderId) {
             if (type === 'income') {
+              const [so] = await connection.query('SELECT order_no FROM sales_orders WHERE id = ?', [orderId]);
+              if (so.length) payload.orderNo = so[0].order_no;
               await connection.query('UPDATE sales_orders SET paid_amount = paid_amount + ? WHERE id = ?', [amount, orderId]);
               await connection.query(`
                 UPDATE sales_orders 
@@ -712,6 +721,8 @@ exports.main = async (event, context) => {
                 WHERE id = ?
               `, [orderId]);
             } else if (type === 'expense') {
+              const [po] = await connection.query('SELECT order_no FROM purchase_orders WHERE id = ?', [orderId]);
+              if (po.length) payload.orderNo = po[0].order_no;
               await connection.query('UPDATE purchase_orders SET paid_amount = paid_amount + ? WHERE id = ?', [amount, orderId]);
               await connection.query(`
                 UPDATE purchase_orders 
@@ -743,8 +754,12 @@ exports.main = async (event, context) => {
 
           await connection.query('DELETE FROM finance_ledgers WHERE id = ?', [id]);
 
+          payload.amount = ledger.amount;
+          payload.orderId = ledger.order_id;
           if (ledger.order_id) {
             if (ledger.type === 'income') {
+              const [so] = await connection.query('SELECT order_no FROM sales_orders WHERE id = ?', [ledger.order_id]);
+              if (so.length) payload.orderNo = so[0].order_no;
               await connection.query('UPDATE sales_orders SET paid_amount = paid_amount - ? WHERE id = ?', [ledger.amount, ledger.order_id]);
               await connection.query(`
                 UPDATE sales_orders 
@@ -756,6 +771,8 @@ exports.main = async (event, context) => {
                 WHERE id = ?
               `, [ledger.order_id]);
             } else if (ledger.type === 'expense') {
+              const [po] = await connection.query('SELECT order_no FROM purchase_orders WHERE id = ?', [ledger.order_id]);
+              if (po.length) payload.orderNo = po[0].order_no;
               await connection.query('UPDATE purchase_orders SET paid_amount = paid_amount - ? WHERE id = ?', [ledger.amount, ledger.order_id]);
               await connection.query(`
                 UPDATE purchase_orders 
