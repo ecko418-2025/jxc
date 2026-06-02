@@ -235,6 +235,7 @@ export const dataUtils = {
 
 export const auditDB = {
   getList: async () => {
-    return callApi('getAuditLogs');
+    const res = await callApi('getAuditLogs');
+    return res.data || [];
   }
 };
