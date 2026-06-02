@@ -361,14 +361,16 @@ const ProposalsPage: React.FC = () => {
                   className: 'hide-on-print',
                 },
                 { 
+                  title: '产品编码', 
+                  dataIndex: 'sku', 
+                  width: 100,
+                  render: (v) => <span style={{ fontFamily: 'monospace' }}>{v}</span>
+                },
+                { 
                   title: '产品名称', 
-                  width: 200, 
-                  render: (_, record) => (
-                    <span>
-                      <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)', marginRight: 6 }}>[{record.sku}]</span>
-                      <Text strong style={{ color: 'var(--text-primary)' }}>{record.name}</Text>
-                    </span>
-                  )
+                  dataIndex: 'name', 
+                  width: 160,
+                  render: (v) => <Text strong style={{ color: 'var(--text-primary)' }}>{v}</Text>
                 },
                 { title: '分类', dataIndex: 'categoryId', width: 100, render: (id) => categories.find(c => c.id === id)?.name || '未分类' },
                 { title: '品牌', dataIndex: 'brand', width: 100 },
