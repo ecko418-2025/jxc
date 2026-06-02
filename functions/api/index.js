@@ -100,7 +100,7 @@ exports.main = async (event, context) => {
       // =============== Categories ===============
       case 'getCategories': {
         const [rows] = await pool.query('SELECT * FROM categories ORDER BY created_at DESC');
-        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, parentId: r.parent_id })) };
+        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, parentId: r.parent_id, createdAt: r.created_at })) };
       }
       case 'migrate': {
 
@@ -163,7 +163,8 @@ exports.main = async (event, context) => {
           salePrice: parseFloat(p.sale_price),
           minStock: p.min_stock,
           imageUrl: p.image_url,
-          active: p.active === 1
+          active: p.active === 1,
+          createdAt: p.created_at
         }));
         await logAudit(pool, action, payload); return { code: 200, data: products };
       }
@@ -225,7 +226,7 @@ exports.main = async (event, context) => {
       // =============== Suppliers ===============
       case 'getSuppliers': {
         const [rows] = await pool.query('SELECT * FROM suppliers ORDER BY created_at DESC');
-        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, bankAccount: r.bank_account })) };
+        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, bankAccount: r.bank_account, createdAt: r.created_at })) };
       }
       case 'createSupplier': {
         const { name, contact, phone, address, bankAccount, remark } = payload;
@@ -255,7 +256,7 @@ exports.main = async (event, context) => {
       // =============== Customers ===============
       case 'getCustomers': {
         const [rows] = await pool.query('SELECT * FROM customers ORDER BY created_at DESC');
-        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, creditLimit: r.credit_limit ? parseFloat(r.credit_limit) : 0 })) };
+        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, creditLimit: r.credit_limit ? parseFloat(r.credit_limit) : 0, createdAt: r.created_at })) };
       }
       case 'createCustomer': {
         const { name, contact, phone, address, level, creditLimit, remark } = payload;
@@ -296,6 +297,7 @@ exports.main = async (event, context) => {
           order.paymentStatus = order.payment_status;
           order.extOrderNo = order.ext_order_no;
           order.invoiceNo = order.invoice_no;
+          order.createdAt = order.created_at;
         }
         await logAudit(pool, action, payload); return { code: 200, data: orders };
       }
@@ -403,6 +405,7 @@ exports.main = async (event, context) => {
           order.paymentStatus = order.payment_status;
           order.extOrderNo = order.ext_order_no;
           order.invoiceNo = order.invoice_no;
+          order.createdAt = order.created_at;
         }
         await logAudit(pool, action, payload); return { code: 200, data: orders };
       }
@@ -534,7 +537,7 @@ exports.main = async (event, context) => {
       }
       case 'getInventoryLogs': {
         const [rows] = await pool.query('SELECT * FROM inventory_logs ORDER BY created_at DESC LIMIT 500');
-        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, productId: r.product_id, quantity: r.quantity_change })) };
+        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, productId: r.product_id, quantity: r.quantity_change, createdAt: r.created_at })) };
       }
       case 'getInventoryLogsByProduct': {
         const { productId } = payload;
