@@ -12,7 +12,7 @@ import {
   EyeOutlined, DollarOutlined, PrinterOutlined
 } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
-import { salesOrderDB, customerDB, productDB, inventoryDB, financeLedgerDB, auth } from '../../database/db';
+import { salesOrderDB, customerDB, productDB, inventoryDB, financeLedgerDB, getCurrentUser } from '../../database/db';
 import type { SalesOrder, SalesItem, Customer, Product, InventoryRecord, FinanceLedger } from '../../database/types';
 import { CloudImage } from '../../components/CloudImage';
 import { printOrder } from '../../utils/print';
@@ -178,6 +178,7 @@ const SalesPage: React.FC = () => {
         extOrderNo: values.extOrderNo || '',
         remark: values.remark || '',
         items,
+        operator: getCurrentUser(),
       });
       message.success('销售单已创建');
       setModalOpen(false);
@@ -203,7 +204,7 @@ const SalesPage: React.FC = () => {
     if (!detailOrder) return;
     try {
       const values = await infoForm.validateFields();
-      await salesOrderDB.updateInfo(detailOrder.id, values.extOrderNo || '', values.invoiceNo || '', values.remark || '', '系统');
+      await salesOrderDB.updateInfo(detailOrder.id, values.extOrderNo || '', values.invoiceNo || '', values.remark || '', getCurrentUser());
       message.success('订单信息已更新');
       setEditingInfo(false);
       setDetailOrder({ ...detailOrder, extOrderNo: values.extOrderNo, invoiceNo: values.invoiceNo, remark: values.remark });
@@ -215,7 +216,7 @@ const SalesPage: React.FC = () => {
 
   const handleShip = async (id: string) => {
     try {
-      await salesOrderDB.confirmShipment(id, '系统');
+      await salesOrderDB.confirmShipment(id, getCurrentUser());
       message.success('已发货，库存已扣减');
       refreshData();
     } catch (error: any) {
@@ -674,7 +675,7 @@ const SalesPage: React.FC = () => {
                     paymentForm.setFieldsValue({
                       amount: balance,
                       paymentDate: dayjs(),
-                      paymentMethod: 'wechat'
+                      paymentMethod: 'bank'
                     });
                     setPaymentModalOpen(true);
                   }}>录入收款</Button>
@@ -718,7 +719,7 @@ const SalesPage: React.FC = () => {
               paymentMethod: values.paymentMethod,
               paymentDate: values.paymentDate.format('YYYY-MM-DD HH:mm:ss'),
               remark: values.remark,
-              createdBy: auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Admin',
+              createdBy: getCurrentUser(),
             });
             message.success('收款录入成功');
             setPaymentModalOpen(false);
@@ -795,18 +796,27 @@ const SalesPage: React.FC = () => {
       {/* Payment Ledger Details Modal */}
       <Modal
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 32 }}>
-            <span>收款明细 - {currentLedgerOrder?.orderNo}</span>
-            {currentLedgerOrder && currentLedgerOrder.status !== 'draft' && currentLedgerOrder.status !== 'cancelled' && currentLedgerOrder.paymentStatus !== 'paid' && (
-              <Button size="small" type="primary" onClick={() => {
-                const balance = currentLedgerOrder.totalAmount - (currentLedgerOrder.paidAmount || 0);
-                paymentForm.setFieldsValue({
-                  amount: balance,
-                  paymentDate: dayjs(),
-                  paymentMethod: 'wechat'
-                });
-                setPaymentModalOpen(true);
-              }}>录入收款</Button>
+          <div style={{ display: 'flex', flexDirection: 'column', paddingRight: 32 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 16, fontWeight: 500 }}>收款明细 - {currentLedgerOrder?.orderNo}</span>
+              {currentLedgerOrder && currentLedgerOrder.status !== 'draft' && currentLedgerOrder.status !== 'cancelled' && currentLedgerOrder.paymentStatus !== 'paid' && (
+                <Button size="small" type="primary" onClick={() => {
+                  const balance = currentLedgerOrder.totalAmount - (currentLedgerOrder.paidAmount || 0);
+                  paymentForm.setFieldsValue({
+                    amount: balance,
+                    paymentDate: dayjs(),
+                    paymentMethod: 'bank'
+                  });
+                  setPaymentModalOpen(true);
+                }}>录入收款</Button>
+              )}
+            </div>
+            {currentLedgerOrder && (
+              <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-secondary)' }}>
+                <span>订单金额: <Text strong>¥{currentLedgerOrder.totalAmount.toFixed(2)}</Text></span>
+                <span>已收款: <Text type="success">¥{(currentLedgerOrder.paidAmount || 0).toFixed(2)}</Text></span>
+                <span>待收款: <Text type="danger">¥{(currentLedgerOrder.totalAmount - (currentLedgerOrder.paidAmount || 0)).toFixed(2)}</Text></span>
+              </div>
             )}
           </div>
         }

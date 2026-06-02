@@ -23,6 +23,11 @@ export const auth = app.auth({ persistence: 'local' });
 // ========================
 export let isCloudDbReady = false;
 
+export const getCurrentUser = () => {
+  if (!auth.currentUser) return '系统';
+  return auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || '系统管理员';
+};
+
 // 应用启动时不再需要预加载全量数据到内存，因为改为了实时异步请求
 export const initCloudBase = async () => {
   isCloudDbReady = true;
@@ -138,7 +143,7 @@ export const purchaseOrderDB = {
     const res = await callApi('getPurchaseOrders');
     return res.data || [];
   },
-  async create(data: Omit<PurchaseOrder, 'id' | 'orderNo' | 'createdAt' | 'updatedAt'>): Promise<void> {
+  async create(data: Omit<PurchaseOrder, 'id' | 'orderNo' | 'createdAt' | 'updatedAt'> & { operator?: string }): Promise<void> {
     await callApi('createPurchaseOrder', { ...data });
   },
   async update(id: string, data: Partial<PurchaseOrder>): Promise<void> {
@@ -167,7 +172,7 @@ export const salesOrderDB = {
     const res = await callApi('getSalesOrders');
     return res.data || [];
   },
-  async create(data: Omit<SalesOrder, 'id' | 'orderNo' | 'createdAt' | 'updatedAt'>): Promise<void> {
+  async create(data: Omit<SalesOrder, 'id' | 'orderNo' | 'createdAt' | 'updatedAt'> & { operator?: string }): Promise<void> {
     await callApi('createSalesOrder', { ...data });
   },
   async update(id: string, data: Partial<SalesOrder>): Promise<void> {
