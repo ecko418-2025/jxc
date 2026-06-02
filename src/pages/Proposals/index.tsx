@@ -76,6 +76,7 @@ const ProposalsPage: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [searchValue, setSearchValue] = useState<string | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   useEffect(() => {
     loadProducts();
@@ -141,6 +142,12 @@ const ProposalsPage: React.FC = () => {
 
   const handleRemove = (id: string) => {
     setSelectedItems(selectedItems.filter(item => item.id !== id));
+  };
+
+  const handleBatchDelete = () => {
+    setSelectedItems(selectedItems.filter(item => !selectedRowKeys.includes(item.id)));
+    setSelectedRowKeys([]);
+    message.success('已批量删除选中的产品');
   };
 
   const handleClear = () => {
@@ -263,6 +270,11 @@ const ProposalsPage: React.FC = () => {
           <Text type="secondary">
             {selectedItems.length > 0 ? `草稿已自动缓存，共 ${selectedItems.length} 款产品` : '暂无数据'}
           </Text>
+          {selectedRowKeys.length > 0 && (
+            <Popconfirm title={`确定要删除选中的 ${selectedRowKeys.length} 款产品吗？`} onConfirm={handleBatchDelete}>
+              <Button danger>批量删除</Button>
+            </Popconfirm>
+          )}
           <Popconfirm title="确定要清空当前所有选中的产品吗？" onConfirm={handleClear}>
             <Button danger icon={<DeleteOutlined />}>一键清空</Button>
           </Popconfirm>
@@ -316,6 +328,7 @@ const ProposalsPage: React.FC = () => {
                   row: Row,
                 },
               }}
+              rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
               dataSource={selectedProducts}
               rowKey="id"
               loading={loading}
