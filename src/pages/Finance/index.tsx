@@ -3,7 +3,7 @@
 // ========================================
 
 import { useState, useEffect } from 'react';
-import { Table, Card, Typography, Tabs, Tag, message, Button, Input, DatePicker, Space } from 'antd';
+import { Table, Card, Typography, Tabs, Tag, message, Button, Input, DatePicker, Space, Modal } from 'antd';
 import { DeleteOutlined, DownloadOutlined, PrinterOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { financeLedgerDB, customerDB, supplierDB, salesOrderDB, purchaseOrderDB } from '../../database/db';
@@ -26,6 +26,14 @@ export default function Finance() {
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+
+  const [statementModalOpen, setStatementModalOpen] = useState(false);
+  const [selectedParty, setSelectedParty] = useState<Customer | Supplier | null>(null);
+  const [partyType, setPartyType] = useState<'receivable' | 'payable'>('receivable');
+  const [statementDateRange, setStatementDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>([
+    dayjs().startOf('month'),
+    dayjs().endOf('month')
+  ]);
 
   const refreshData = async () => {
     setLoading(true);
@@ -106,7 +114,6 @@ export default function Finance() {
       s.balance > 0
     );
   };
-
   const getLedgerData = () => {
     return ledgers.filter(l => {
       const party = l.type === 'income' 
@@ -122,6 +129,248 @@ export default function Finance() {
       }
       return matchText && matchDate;
     });
+  };
+
+  // ------------------------------------------
+  // 计算对账单明细
+  // ------------------------------------------
+  const getStatementData = () => {
+    if (!selectedParty || !statementDateRange || !statementDateRange[0] || !statementDateRange[1]) {
+      return { openingBalance: 0, items: [], closingBalance: 0 };
+    }
+
+    const startDate = statementDateRange[0].startOf('day');
+    const endDate = statementDateRange[1].endOf('day');
+    const partyId = selectedParty.id;
+
+    let orders: any[] = [];
+    let flowLedgers: FinanceLedger[] = [];
+
+    if (partyType === 'receivable') {
+      orders = salesOrders.filter(o => o.customerId === partyId && o.status !== 'cancelled' && o.status !== 'draft');
+      flowLedgers = ledgers.filter(l => l.partyId === partyId && l.type === 'income');
+    } else {
+      orders = purchaseOrders.filter(o => o.supplierId === partyId && o.status !== 'cancelled' && o.status !== 'draft');
+      flowLedgers = ledgers.filter(l => l.partyId === partyId && l.type === 'expense');
+    }
+
+    // 期初余额 = 该区间之前的所有订单总额 - 所有的资金流水已结额
+    const priorOrders = orders.filter(o => dayjs(o.orderDate).isBefore(startDate));
+    const priorFlows = flowLedgers.filter(l => dayjs(l.paymentDate).isBefore(startDate));
+
+    const priorOrderSum = priorOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+    const priorFlowSum = priorFlows.reduce((sum, l) => sum + Number(l.amount || 0), 0);
+    const openingBalance = priorOrderSum - priorFlowSum;
+
+    // 区间内明细
+    const currentOrders = orders.filter(o => {
+      const d = dayjs(o.orderDate);
+      return d.isAfter(startDate.subtract(1, 'second')) && d.isBefore(endDate.add(1, 'second'));
+    });
+
+    const currentFlows = flowLedgers.filter(l => {
+      const d = dayjs(l.paymentDate);
+      return d.isAfter(startDate.subtract(1, 'second')) && d.isBefore(endDate.add(1, 'second'));
+    });
+
+    const timelineItems: any[] = [];
+
+    currentOrders.forEach(o => {
+      timelineItems.push({
+        date: o.orderDate,
+        type: partyType === 'receivable' ? '销售出库' : '采购入库',
+        docNo: o.orderNo,
+        amount: Number(o.totalAmount || 0),
+        remark: o.remark || ''
+      });
+    });
+
+    currentFlows.forEach(l => {
+      let orderNo = '独立流水';
+      if (l.orderId) {
+        if (partyType === 'receivable') {
+          orderNo = salesOrders.find(o => o.id === l.orderId)?.orderNo || l.orderId;
+        } else {
+          orderNo = purchaseOrders.find(o => o.id === l.orderId)?.orderNo || l.orderId;
+        }
+      }
+      timelineItems.push({
+        date: l.paymentDate,
+        type: partyType === 'receivable' ? '销售收款' : '采购付款',
+        docNo: orderNo,
+        amount: -Number(l.amount || 0),
+        remark: l.remark || ''
+      });
+    });
+
+    timelineItems.sort((a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf());
+
+    let currentBalance = openingBalance;
+    const items = timelineItems.map(item => {
+      currentBalance += item.amount;
+      return {
+        ...item,
+        balance: currentBalance
+      };
+    });
+
+    return {
+      openingBalance,
+      items,
+      closingBalance: currentBalance
+    };
+  };
+
+  // ------------------------------------------
+  // 打印 PDF 对账单
+  // ------------------------------------------
+  const handlePrintStatement = () => {
+    if (!selectedParty || !statementDateRange) return;
+    const data = getStatementData();
+    const dateStr = dayjs().format('YYYY-MM-DD HH:mm');
+    const rangeStr = `${statementDateRange[0].format('YYYY-MM-DD')} 至 ${statementDateRange[1].format('YYYY-MM-DD')}`;
+    const partyName = selectedParty.name;
+    const contact = selectedParty.contact ? `${selectedParty.contact} (${selectedParty.phone || ''})` : (selectedParty.phone || '—');
+    const title = `${partyType === 'receivable' ? '客户应收账目对账单' : '供应商应付账目对账单'}`;
+    const typeLabel = partyType === 'receivable' ? '应收余额' : '应付余额';
+
+    const html = `<!DOCTYPE html>
+      <html><head><meta charset="utf-8"><title>${title}</title>
+      <style>
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; padding: 30px; color: #333; }
+        .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-bottom: 20px; }
+        .header h1 { margin: 0; font-size: 24px; color: #1e3a8a; }
+        .header .meta { text-align: right; font-size: 13px; color: #666; line-height: 1.6; }
+        .summary-box { display: flex; gap: 20px; margin-bottom: 20px; }
+        .summary-card { flex: 1; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; background: #fafafa; }
+        .summary-card .title { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+        .summary-card .value { font-size: 18px; font-weight: bold; color: #1f2937; }
+        .summary-card.highlight .value { color: #dc2626; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+        th { background: #f3f4f6; font-weight: 600; text-align: left; }
+        th, td { border: 1px solid #e5e7eb; padding: 8px 12px; }
+        tr:nth-child(even) { background: #f9fafb; }
+        .amount-pos { color: #dc2626; font-weight: bold; }
+        .amount-neg { color: #16a34a; font-weight: bold; }
+        .footer { margin-top: 50px; display: flex; justify-content: space-between; font-size: 14px; color: #374151; }
+        .footer-sign { width: 250px; border-bottom: 1px solid #9ca3af; height: 40px; margin-top: 10px; }
+        @media print { body { padding: 0; } }
+      </style></head><body>
+      <div class="header">
+        <div>
+          <h1>${title}</h1>
+          <div style="margin-top: 6px; font-size: 14px;"><strong>客商名称：</strong>${partyName} &nbsp;|&nbsp; <strong>联络人：</strong>${contact}</div>
+        </div>
+        <div class="meta">
+          <div><strong>对账区间：</strong>${rangeStr}</div>
+          <div><strong>打印时间：</strong>${dateStr}</div>
+        </div>
+      </div>
+
+      <div class="summary-box">
+        <div class="summary-card">
+          <div class="title">期初${typeLabel}</div>
+          <div class="value">¥${data.openingBalance.toFixed(2)}</div>
+        </div>
+        <div class="summary-card">
+          <div class="title">期间发生额</div>
+          <div class="value">${(data.closingBalance - data.openingBalance) >= 0 ? '+' : ''}¥${(data.closingBalance - data.openingBalance).toFixed(2)}</div>
+        </div>
+        <div class="summary-card highlight">
+          <div class="title">期末结余${typeLabel}</div>
+          <div class="value">¥${data.closingBalance.toFixed(2)}</div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 15%">日期</th>
+            <th style="width: 15%">业务类型</th>
+            <th style="width: 20%">单据号 / 流水号</th>
+            <th style="width: 15%">发生金额</th>
+            <th style="width: 15%">累计结余金额</th>
+            <th style="width: 20%">备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${statementDateRange[0].format('YYYY-MM-DD')}</td>
+            <td><strong>期初余额</strong></td>
+            <td>—</td>
+            <td>—</td>
+            <td><strong>¥${data.openingBalance.toFixed(2)}</strong></td>
+            <td>对账期前未结款项累计</td>
+          </tr>
+          ${data.items.map(item => {
+            const isPos = item.amount >= 0;
+            return `<tr>
+              <td>${dayjs(item.date).format('YYYY-MM-DD')}</td>
+              <td>${item.type}</td>
+              <td style="font-family: monospace;">${item.docNo}</td>
+              <td class="${isPos ? 'amount-pos' : 'amount-neg'}">${isPos ? '+' : ''}¥${item.amount.toFixed(2)}</td>
+              <td style="font-weight: bold;">¥${item.balance.toFixed(2)}</td>
+              <td>${item.remark || ''}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+
+      <div class="footer">
+        <div>
+          <div>我方制单人（盖章签名）：</div>
+          <div class="footer-sign"></div>
+        </div>
+        <div>
+          <div>客商确认人（签字盖章）：</div>
+          <div class="footer-sign"></div>
+          <div style="font-size: 11px; color: #9ca3af; margin-top: 6px;">收到账单核对无误后请签字盖章回传</div>
+        </div>
+      </div>
+      </body></html>`;
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+      setTimeout(() => win.print(), 400);
+    }
+  };
+
+  // ------------------------------------------
+  // 导出 Excel 对账单
+  // ------------------------------------------
+  const handleExportStatementExcel = () => {
+    if (!selectedParty || !statementDateRange) return;
+    const data = getStatementData();
+    
+    const rows = [
+      {
+        '日期': statementDateRange[0].format('YYYY-MM-DD'),
+        '业务类型': '期初余额',
+        '单据号/流水号': '—',
+        '发生金额': '—',
+        '累计结余': Number(data.openingBalance).toFixed(2),
+        '备注': '期初累计余额'
+      },
+      ...data.items.map(item => ({
+        '日期': dayjs(item.date).format('YYYY-MM-DD'),
+        '业务类型': item.type,
+        '单据号/流水号': item.docNo,
+        '发生金额': `${item.amount >= 0 ? '+' : ''}${Number(item.amount).toFixed(2)}`,
+        '累计结余': Number(item.balance).toFixed(2),
+        '备注': item.remark || ''
+      }))
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '往来账目对账单');
+    
+    const fileName = `往来对账单_${selectedParty.name}_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    message.success('对账单 Excel 导出成功');
   };
 
   // ------------------------------------------
@@ -276,6 +525,11 @@ export default function Finance() {
                   </Text>
                 ) },
                 { title: '信用额度', dataIndex: 'creditLimit', key: 'creditLimit', render: (v) => v ? `¥${v}` : '无限制' },
+                { title: '操作', key: 'action', render: (_, r) => (
+                  <Button size="small" type="primary" ghost onClick={() => { setSelectedParty(r); setPartyType('receivable'); setStatementModalOpen(true); }}>
+                    对账单
+                  </Button>
+                ) }
               ]}
             />
           </Tabs.TabPane>
@@ -295,6 +549,11 @@ export default function Finance() {
                 { title: '历史总采购额', dataIndex: 'totalOrdered', key: 'totalOrdered', render: (v) => `¥${Number(v).toFixed(2)}` },
                 { title: '历史总已付款', dataIndex: 'totalPaid', key: 'totalPaid', render: (v) => <Text type="warning">¥{Number(v).toFixed(2)}</Text> },
                 { title: '当前欠款', dataIndex: 'balance', key: 'balance', render: (v) => <Text strong type={v > 0 ? 'danger' : 'secondary'}>¥{Number(v).toFixed(2)}</Text> },
+                { title: '操作', key: 'action', render: (_, r) => (
+                  <Button size="small" type="primary" ghost onClick={() => { setSelectedParty(r); setPartyType('payable'); setStatementModalOpen(true); }}>
+                    对账单
+                  </Button>
+                ) }
               ]}
             />
           </Tabs.TabPane>
@@ -358,6 +617,93 @@ export default function Finance() {
           </Tabs.TabPane>
         </Tabs>
       </Card>
+
+      {/* 对账单 Modal */}
+      <Modal
+        title={`${partyType === 'receivable' ? '客户' : '供应商'}往来账目对账单 - ${selectedParty?.name || ''}`}
+        open={statementModalOpen}
+        onCancel={() => setStatementModalOpen(false)}
+        width={900}
+        footer={[
+          <Button key="excel" icon={<DownloadOutlined />} onClick={handleExportStatementExcel}>
+            导出 Excel
+          </Button>,
+          <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={handlePrintStatement}>
+            打印/生成 PDF
+          </Button>,
+          <Button key="close" onClick={() => setStatementModalOpen(false)}>
+            关闭
+          </Button>,
+        ]}
+      >
+        <div style={{ marginTop: 16 }}>
+          <Space style={{ marginBottom: 16 }}>
+            <Text strong>选择对账区间:</Text>
+            <DatePicker.RangePicker
+              value={statementDateRange}
+              onChange={(dates: any) => setStatementDateRange(dates)}
+              allowClear={false}
+              placeholder={['开始日期', '结束日期']}
+            />
+          </Space>
+
+          {selectedParty && (
+            <>
+              {/* Summary Statistics */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                <Card size="small" style={{ flex: 1, background: '#fafafa' }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>期初余额</Text>
+                  <div style={{ fontSize: 20, fontWeight: 'bold', marginTop: 4 }}>
+                    ¥{getStatementData().openingBalance.toFixed(2)}
+                  </div>
+                </Card>
+                <Card size="small" style={{ flex: 1, background: '#fafafa' }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>期间变动</Text>
+                  <div style={{ fontSize: 20, fontWeight: 'bold', marginTop: 4, color: (getStatementData().closingBalance - getStatementData().openingBalance) >= 0 ? '#ef4444' : '#22c55e' }}>
+                    {(getStatementData().closingBalance - getStatementData().openingBalance) >= 0 ? '+' : ''}¥{(getStatementData().closingBalance - getStatementData().openingBalance).toFixed(2)}
+                  </div>
+                </Card>
+                <Card size="small" style={{ flex: 1, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>期末结余</Text>
+                  <div style={{ fontSize: 20, fontWeight: 'bold', marginTop: 4, color: '#1d4ed8' }}>
+                    ¥{getStatementData().closingBalance.toFixed(2)}
+                  </div>
+                </Card>
+              </div>
+
+              {/* Statement Preview Table */}
+              <Table
+                dataSource={[
+                  {
+                    date: statementDateRange ? statementDateRange[0].format('YYYY-MM-DD') : '',
+                    type: '期初余额',
+                    docNo: '—',
+                    amount: 0,
+                    balance: getStatementData().openingBalance,
+                    remark: '对账周期前的累计未结账目'
+                  },
+                  ...getStatementData().items
+                ]}
+                columns={[
+                  { title: '日期', dataIndex: 'date', key: 'date', render: (v, r) => r.type === '期初余额' ? v : dayjs(v).format('YYYY-MM-DD') },
+                  { title: '业务类型', dataIndex: 'type', key: 'type', render: (v) => <Tag color={v.includes('出库') || v.includes('入库') ? 'blue' : v === '期初余额' ? 'default' : 'green'}>{v}</Tag> },
+                  { title: '单据号/流水号', dataIndex: 'docNo', key: 'docNo', render: (v) => <span style={{ fontFamily: 'monospace' }}>{v}</span> },
+                  { title: '变动金额', dataIndex: 'amount', key: 'amount', render: (v, r) => {
+                    if (r.type === '期初余额') return '—';
+                    const isPos = v >= 0;
+                    return <span style={{ color: isPos ? '#ef4444' : '#22c55e', fontWeight: 'bold' }}>{isPos ? '+' : ''}¥{v.toFixed(2)}</span>;
+                  } },
+                  { title: '应收/应付余额', dataIndex: 'balance', key: 'balance', render: (v) => <strong>¥{v.toFixed(2)}</strong> },
+                  { title: '备注', dataIndex: 'remark', key: 'remark' },
+                ]}
+                rowKey={(r, idx) => `${r.docNo}-${idx}`}
+                pagination={{ defaultPageSize: 10, showSizeChanger: true }}
+                size="small"
+              />
+            </>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
