@@ -416,7 +416,6 @@ body {
 /* Print Styles */
 @media print {
   @page {
-    size: landscape;
     margin: 10mm;
   }
   body, .ant-layout, .ant-card, #root {
