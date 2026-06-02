@@ -12,7 +12,7 @@ import {
   EyeOutlined, DollarOutlined, PrinterOutlined
 } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
-import { salesOrderDB, customerDB, productDB, inventoryDB, financeLedgerDB } from '../../database/db';
+import { salesOrderDB, customerDB, productDB, inventoryDB, financeLedgerDB, auth } from '../../database/db';
 import type { SalesOrder, SalesItem, Customer, Product, InventoryRecord, FinanceLedger } from '../../database/types';
 import { CloudImage } from '../../components/CloudImage';
 import { printOrder } from '../../utils/print';
@@ -171,6 +171,7 @@ const SalesPage: React.FC = () => {
         discount: values.discount || 0,
         status: 'draft',
         paymentStatus: 'pending',
+        paidAmount: 0,
         extOrderNo: values.extOrderNo || '',
         remark: values.remark || '',
         items,

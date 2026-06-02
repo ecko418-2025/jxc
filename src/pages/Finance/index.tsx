@@ -2,9 +2,9 @@
 // 财务管理 - Finance Management
 // ========================================
 
-import React, { useState, useEffect } from 'react';
-import { Table, Card, Typography, Tabs, Tag, message, Button, Modal, Form, InputNumber, Select, DatePicker, Row, Col, Space, Input } from 'antd';
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { useState, useEffect } from 'react';
+import { Table, Card, Typography, Tabs, Tag, message, Button, Input } from 'antd';
+import { DeleteOutlined } from '@ant-design/icons';
 import { financeLedgerDB, customerDB, supplierDB, salesOrderDB, purchaseOrderDB } from '../../database/db';
 import type { FinanceLedger, Customer, Supplier, SalesOrder, PurchaseOrder } from '../../database/types';
 import dayjs from 'dayjs';

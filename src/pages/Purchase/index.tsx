@@ -148,6 +148,8 @@ const PurchasePage: React.FC = () => {
         orderDate: values.orderDate.format('YYYY-MM-DD HH:mm:ss'),
         totalAmount,
         status: 'draft',
+        paymentStatus: 'pending',
+        paidAmount: 0,
         extOrderNo: values.extOrderNo || '',
         remark: values.remark || '',
         items,

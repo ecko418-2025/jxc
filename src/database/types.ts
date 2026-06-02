@@ -155,3 +155,16 @@ export interface AuditLog {
   payload: any;
   created_at: string;
 }
+
+export interface FinanceLedger {
+  id: string;
+  type: 'income' | 'expense';  // income: 客户收款(应收) | expense: 供应商付款(应付)
+  partyId: string;             // 关联的 customerId 或 supplierId
+  orderId?: string;            // 可选：关联的具体采购单/销售单的 ID
+  amount: number;              // 实收/实付金额
+  paymentMethod: 'wechat' | 'alipay' | 'bank' | 'cash'; // 支付方式
+  paymentDate: string;         // 收付款日期
+  remark?: string;             // 摘要/备注
+  createdBy: string;           // 经办人
+  createdAt: string;
+}
