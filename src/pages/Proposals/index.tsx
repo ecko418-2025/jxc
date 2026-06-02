@@ -360,7 +360,16 @@ const ProposalsPage: React.FC = () => {
                   width: 50,
                   className: 'hide-on-print',
                 },
-                { title: '产品名称', dataIndex: 'name', width: 160 },
+                { 
+                  title: '产品名称', 
+                  width: 200, 
+                  render: (_, record) => (
+                    <span>
+                      <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)', marginRight: 6 }}>[{record.sku}]</span>
+                      <Text strong style={{ color: 'var(--text-primary)' }}>{record.name}</Text>
+                    </span>
+                  )
+                },
                 { title: '分类', dataIndex: 'categoryId', width: 100, render: (id) => categories.find(c => c.id === id)?.name || '未分类' },
                 { title: '品牌', dataIndex: 'brand', width: 100 },
                 { title: '规格型号', dataIndex: 'spec', width: 120 },
@@ -380,7 +389,7 @@ const ProposalsPage: React.FC = () => {
                 { 
                   title: '客户备注',
                   dataIndex: '_remark',
-                  width: 130,
+                  width: 75,
                   render: (text, record) => <Input value={text} onChange={(e) => handleRemarkChange(record.id, e.target.value)} />
                 },
                 {
