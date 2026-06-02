@@ -342,12 +342,6 @@ const ProposalsPage: React.FC = () => {
                   width: 50,
                   className: 'hide-on-print',
                 },
-                {
-                  title: '图片',
-                  dataIndex: 'imageUrl',
-                  width: 80,
-                  render: (url) => <CloudImage src={url} style={{ width: 40, height: 40, objectFit: 'cover' }} preview />,
-                },
                 { title: '产品名称', dataIndex: 'name', width: 160 },
                 { title: '分类', dataIndex: 'categoryId', width: 100, render: (id) => categories.find(c => c.id === id)?.name || '未分类' },
                 { title: '品牌', dataIndex: 'brand', width: 100 },
@@ -364,6 +358,12 @@ const ProposalsPage: React.FC = () => {
                   dataIndex: '_remark',
                   width: 200,
                   render: (text, record) => <Input placeholder="添加备注" value={text} onChange={(e) => handleRemarkChange(record.id, e.target.value)} />
+                },
+                {
+                  title: '图片',
+                  dataIndex: 'imageUrl',
+                  width: 80,
+                  render: (url) => <CloudImage src={url} style={{ width: 40, height: 40, objectFit: 'cover' }} preview />,
                 },
                 {
                   title: '操作',

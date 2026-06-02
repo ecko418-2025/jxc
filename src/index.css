@@ -415,6 +415,10 @@ body {
 
 /* Print Styles */
 @media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
   body, .ant-layout, .ant-card, #root {
     background: white !important;
     color: black !important;
@@ -448,5 +452,20 @@ body {
   }
   .ant-table-selection-column {
     display: none !important;
+  }
+}
+@media print {
+  .ant-table-cell {
+    word-break: keep-all !important;
+    white-space: nowrap !important;
+  }
+  .ant-table-cell:has(.ant-input), .ant-table-cell:nth-child(9) {
+    white-space: normal !important;
+  }
+}
+@media print {
+  .ant-table-tbody > tr > td {
+    height: 60px !important;
+    vertical-align: middle !important;
   }
 }
