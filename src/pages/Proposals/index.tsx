@@ -371,17 +371,17 @@ const ProposalsPage: React.FC = () => {
                   width: 120,
                   render: (v) => <Text strong style={{ color: '#22c55e' }}>¥{Number(v).toFixed(2)}</Text>
                 },
-                { 
-                  title: '客户备注',
-                  dataIndex: '_remark',
-                  width: 130,
-                  render: (text, record) => <Input value={text} onChange={(e) => handleRemarkChange(record.id, e.target.value)} />
-                },
                 {
                   title: '图片',
                   dataIndex: 'imageUrl',
                   width: 80,
                   render: (url) => <CloudImage src={url} style={{ width: 40, height: 40, objectFit: 'cover' }} preview />,
+                },
+                { 
+                  title: '客户备注',
+                  dataIndex: '_remark',
+                  width: 130,
+                  render: (text, record) => <Input value={text} onChange={(e) => handleRemarkChange(record.id, e.target.value)} />
                 },
                 {
                   title: '操作',
