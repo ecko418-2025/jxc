@@ -3,12 +3,17 @@
 // ========================================
 
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Space, Typography, Popconfirm, message, Upload, Select } from 'antd';
-import { DownloadOutlined, UploadOutlined, DeleteOutlined, FileDoneOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Space, Typography, Popconfirm, message, Upload, Select, Input } from 'antd';
+import { DownloadOutlined, UploadOutlined, DeleteOutlined, FileDoneOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import { productDB, categoryDB } from '../../database/db';
 import type { Product, Category } from '../../database/types';
 import { CloudImage } from '../../components/CloudImage';
+
+interface SelectedItem {
+  id: string;
+  remark: string;
+}
 
 const { Title, Text } = Typography;
 
@@ -18,7 +23,7 @@ const ProposalsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [searchValue, setSearchValue] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,7 +32,12 @@ const ProposalsPage: React.FC = () => {
     try {
       const draft = localStorage.getItem(STORAGE_KEY);
       if (draft) {
-        setSelectedIds(JSON.parse(draft));
+        const parsed = JSON.parse(draft);
+        if (parsed.length > 0 && typeof parsed[0] === 'string') {
+          setSelectedItems(parsed.map((id: string) => ({ id, remark: '' })));
+        } else {
+          setSelectedItems(parsed);
+        }
       }
     } catch (e) {
       console.error('Failed to parse draft', e);
@@ -36,8 +46,8 @@ const ProposalsPage: React.FC = () => {
 
   // Sync to draft
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedIds));
-  }, [selectedIds]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedItems));
+  }, [selectedItems]);
 
   const loadProducts = async () => {
     setLoading(true);
@@ -56,27 +66,44 @@ const ProposalsPage: React.FC = () => {
   };
 
   const handleAddProduct = (id: string) => {
-    if (selectedIds.includes(id)) {
+    if (selectedItems.some(item => item.id === id)) {
       message.warning('该产品已在列表中');
       return;
     }
-    setSelectedIds([...selectedIds, id]);
+    setSelectedItems([...selectedItems, { id, remark: '' }]);
     setSearchValue(null);
     message.success('已添加到标书列表');
   };
 
+  const handleMove = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === selectedItems.length - 1) return;
+    const newItems = [...selectedItems];
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    [newItems[index], newItems[swapIndex]] = [newItems[swapIndex], newItems[index]];
+    setSelectedItems(newItems);
+  };
+
+  const handleRemarkChange = (id: string, value: string) => {
+    setSelectedItems(selectedItems.map(item => item.id === id ? { ...item, remark: value } : item));
+  };
+
   const handleRemove = (id: string) => {
-    setSelectedIds(selectedIds.filter(item => item !== id));
+    setSelectedItems(selectedItems.filter(item => item.id !== id));
   };
 
   const handleClear = () => {
-    setSelectedIds([]);
+    setSelectedItems([]);
     message.success('标书列表已清空');
   };
 
-  const selectedProducts = selectedIds
-    .map(id => allProducts.find(p => p.id === id))
-    .filter(Boolean) as Product[];
+  const selectedProducts = selectedItems
+    .map(item => {
+      const p = allProducts.find(p => p.id === item.id);
+      if (p) return { ...p, _remark: item.remark };
+      return null;
+    })
+    .filter(Boolean) as (Product & { _remark: string })[];
 
   // 导出 Excel
   const handleExport = () => {
@@ -95,7 +122,7 @@ const ProposalsPage: React.FC = () => {
         规格型号: p.spec || '',
         库存单位: p.unit || '',
         销售单价: Number(p.salePrice).toFixed(2),
-        客户备注: '', // 空白列供客户填写
+        客户备注: p._remark || '', // 空白列供客户填写
         图片预览: p.imageUrl ? '点击查看图片' : '无图片',
       };
     });
@@ -138,17 +165,18 @@ const ProposalsPage: React.FC = () => {
         const rows: any[] = XLSX.utils.sheet_to_json(ws);
 
         let addedCount = 0;
-        const newIds = [...selectedIds];
+        const newItems = [...selectedItems];
 
         rows.forEach(row => {
           const id = row['系统编号'];
-          if (id && allProducts.some(p => p.id === id) && !newIds.includes(id)) {
-            newIds.push(id);
+          const remark = row['客户备注'] || '';
+          if (id && allProducts.some(p => p.id === id) && !newItems.some(item => item.id === id)) {
+            newItems.push({ id, remark: String(remark) });
             addedCount++;
           }
         });
 
-        setSelectedIds(newIds);
+        setSelectedItems(newItems);
         if (addedCount > 0) {
           message.success(`成功导入并追加了 ${addedCount} 款产品`);
         } else {
@@ -168,7 +196,7 @@ const ProposalsPage: React.FC = () => {
         <Title level={4} style={{ margin: 0 }}><FileDoneOutlined /> 投标标书制单</Title>
         <Space>
           <Text type="secondary">
-            {selectedIds.length > 0 ? `草稿已自动缓存，共 ${selectedIds.length} 款产品` : '暂无数据'}
+            {selectedItems.length > 0 ? `草稿已自动缓存，共 ${selectedItems.length} 款产品` : '暂无数据'}
           </Text>
           <Popconfirm title="确定要清空当前所有选中的产品吗？" onConfirm={handleClear}>
             <Button danger icon={<DeleteOutlined />}>一键清空</Button>
@@ -176,7 +204,7 @@ const ProposalsPage: React.FC = () => {
           <Upload beforeUpload={handleImport} showUploadList={false} accept=".xlsx,.xls">
             <Button icon={<UploadOutlined />}>导入历史标书</Button>
           </Upload>
-          <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport} disabled={selectedIds.length === 0}>
+          <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport} disabled={selectedItems.length === 0}>
             下载报表 (Excel)
           </Button>
         </Space>
@@ -230,6 +258,12 @@ const ProposalsPage: React.FC = () => {
             { title: '规格型号', dataIndex: 'spec', width: 120 },
             { title: '单位', dataIndex: 'unit', width: 80 },
             { 
+              title: '客户备注',
+              dataIndex: '_remark',
+              width: 200,
+              render: (text, record) => <Input placeholder="添加备注" value={text} onChange={(e) => handleRemarkChange(record.id, e.target.value)} />
+            },
+            { 
               title: '销售价', 
               dataIndex: 'salePrice', 
               width: 120,
@@ -238,8 +272,12 @@ const ProposalsPage: React.FC = () => {
             {
               title: '操作',
               width: 80,
-              render: (_, record) => (
-                <Button type="text" danger size="small" onClick={() => handleRemove(record.id)}>移除</Button>
+              render: (_, record, index) => (
+                <Space>
+                  <Button type="text" icon={<ArrowUpOutlined />} size="small" disabled={index === 0} onClick={() => handleMove(index, 'up')} />
+                  <Button type="text" icon={<ArrowDownOutlined />} size="small" disabled={index === selectedItems.length - 1} onClick={() => handleMove(index, 'down')} />
+                  <Button type="text" danger size="small" onClick={() => handleRemove(record.id)}>移除</Button>
+                </Space>
               )
             }
           ]}
