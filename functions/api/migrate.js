@@ -38,6 +38,40 @@ async function migrate() {
     console.log("audit_logs skip: " + e.message);
   }
 
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS finance_ledgers (
+        id VARCHAR(36) PRIMARY KEY,
+        type VARCHAR(20),
+        party_id VARCHAR(36),
+        order_id VARCHAR(36),
+        amount DECIMAL(10,2) DEFAULT 0.00,
+        payment_method VARCHAR(50),
+        payment_date DATETIME,
+        remark VARCHAR(255),
+        created_by VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log("Created finance_ledgers table");
+  } catch(e) {
+    console.log("finance_ledgers skip: " + e.message);
+  }
+
+  try {
+    await pool.query("ALTER TABLE purchase_orders ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0.00 AFTER total_amount;");
+    console.log("Added paid_amount to purchase_orders");
+  } catch(e) {
+    console.log("purchase_orders paid_amount skip: " + e.message);
+  }
+
+  try {
+    await pool.query("ALTER TABLE sales_orders ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0.00 AFTER total_amount;");
+    console.log("Added paid_amount to sales_orders");
+  } catch(e) {
+    console.log("sales_orders paid_amount skip: " + e.message);
+  }
+
   process.exit(0);
 }
 

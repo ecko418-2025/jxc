@@ -51,6 +51,12 @@ async function logAudit(pool, action, payload) {
   if (action === 'createSupplier') message = `添加了供应商: ${payload.name}`;
   if (action === 'createCustomer') message = `添加了客户: ${payload.name}`;
   
+  if (action === 'createFinanceLedger') {
+    const isIncome = payload.type === 'income';
+    message = `确认了一笔 ${payload.amount} 元的${isIncome ? '收款' : '付款'}`;
+  }
+  if (action === 'deleteFinanceLedger') message = `删除了财务流水: ${payload.id}`;
+
   const user = '系统管理员';
 
   try {
@@ -633,6 +639,100 @@ exports.main = async (event, context) => {
         const { orderId } = payload;
         const [logs] = await pool.query('SELECT * FROM order_logs WHERE order_id = ? ORDER BY created_at DESC', [orderId]);
         await logAudit(pool, action, payload); return { code: 200, data: logs };
+      }
+
+      case 'getFinanceLedgers': {
+        const [rows] = await pool.query('SELECT * FROM finance_ledgers ORDER BY payment_date DESC, created_at DESC LIMIT 500');
+        await logAudit(pool, action, payload); return { code: 200, data: rows };
+      }
+
+      case 'createFinanceLedger': {
+        const { type, partyId, orderId, amount, paymentMethod, paymentDate, remark, createdBy } = payload;
+        const id = crypto.randomUUID();
+        
+        const connection = await pool.getConnection();
+        try {
+          await connection.beginTransaction();
+
+          await connection.query(
+            'INSERT INTO finance_ledgers (id, type, party_id, order_id, amount, payment_method, payment_date, remark, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, type, partyId, orderId || null, amount, paymentMethod, paymentDate, remark || '', createdBy]
+          );
+
+          if (orderId) {
+            if (type === 'income') {
+              await connection.query('UPDATE sales_orders SET paid_amount = paid_amount + ? WHERE id = ?', [amount, orderId]);
+              await connection.query(`
+                UPDATE sales_orders 
+                SET payment_status = CASE WHEN paid_amount >= total_amount THEN 'paid' ELSE 'partial' END
+                WHERE id = ?
+              `, [orderId]);
+            } else if (type === 'expense') {
+              await connection.query('UPDATE purchase_orders SET paid_amount = paid_amount + ? WHERE id = ?', [amount, orderId]);
+              await connection.query(`
+                UPDATE purchase_orders 
+                SET payment_status = CASE WHEN paid_amount >= total_amount THEN 'paid' ELSE 'partial' END
+                WHERE id = ?
+              `, [orderId]);
+            }
+          }
+
+          await connection.commit();
+          await logAudit(pool, action, payload); return { code: 200, message: 'Finance ledger created' };
+        } catch (e) {
+          await connection.rollback();
+          throw e;
+        } finally {
+          connection.release();
+        }
+      }
+
+      case 'deleteFinanceLedger': {
+        const { id } = payload;
+        const connection = await pool.getConnection();
+        try {
+          await connection.beginTransaction();
+          
+          const [ledgers] = await connection.query('SELECT * FROM finance_ledgers WHERE id = ?', [id]);
+          if (ledgers.length === 0) throw new Error('Ledger not found');
+          const ledger = ledgers[0];
+
+          await connection.query('DELETE FROM finance_ledgers WHERE id = ?', [id]);
+
+          if (ledger.order_id) {
+            if (ledger.type === 'income') {
+              await connection.query('UPDATE sales_orders SET paid_amount = paid_amount - ? WHERE id = ?', [ledger.amount, ledger.order_id]);
+              await connection.query(`
+                UPDATE sales_orders 
+                SET payment_status = CASE 
+                  WHEN paid_amount <= 0 THEN 'pending' 
+                  WHEN paid_amount >= total_amount THEN 'paid' 
+                  ELSE 'partial' 
+                END
+                WHERE id = ?
+              `, [ledger.order_id]);
+            } else if (ledger.type === 'expense') {
+              await connection.query('UPDATE purchase_orders SET paid_amount = paid_amount - ? WHERE id = ?', [ledger.amount, ledger.order_id]);
+              await connection.query(`
+                UPDATE purchase_orders 
+                SET payment_status = CASE 
+                  WHEN paid_amount <= 0 THEN 'pending' 
+                  WHEN paid_amount >= total_amount THEN 'paid' 
+                  ELSE 'partial' 
+                END
+                WHERE id = ?
+              `, [ledger.order_id]);
+            }
+          }
+
+          await connection.commit();
+          await logAudit(pool, action, payload); return { code: 200, message: 'Finance ledger deleted' };
+        } catch (e) {
+          await connection.rollback();
+          throw e;
+        } finally {
+          connection.release();
+        }
       }
 
       default:

@@ -5,7 +5,8 @@
 import cloudbase from '@cloudbase/js-sdk';
 import type { 
   Category, Product, Supplier, Customer, 
-  PurchaseOrder, SalesOrder, InventoryRecord, InventoryLog 
+  PurchaseOrder, SalesOrder, InventoryRecord, InventoryLog,
+  FinanceLedger 
 } from './types';
 
 // ========================
@@ -239,3 +240,20 @@ export const auditDB = {
     return res.data || [];
   }
 };
+
+// ========================
+// Finance Ledgers
+// ========================
+export const financeLedgerDB = {
+  async getAll(): Promise<FinanceLedger[]> {
+    const res = await callApi('getFinanceLedgers');
+    return res.data || [];
+  },
+  async create(data: Omit<FinanceLedger, 'id' | 'createdAt'>): Promise<void> {
+    await callApi('createFinanceLedger', { ...data });
+  },
+  async delete(id: string): Promise<void> {
+    await callApi('deleteFinanceLedger', { id });
+  },
+};
+

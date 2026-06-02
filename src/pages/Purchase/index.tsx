@@ -12,8 +12,8 @@ import {
   EyeOutlined, PrinterOutlined
 } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
-import { purchaseOrderDB, supplierDB, productDB, inventoryDB } from '../../database/db';
-import type { PurchaseOrder, PurchaseItem, Supplier, Product } from '../../database/types';
+import { purchaseOrderDB, supplierDB, productDB, inventoryDB, financeLedgerDB, auth } from '../../database/db';
+import type { PurchaseOrder, PurchaseItem, Supplier, Product, FinanceLedger } from '../../database/types';
 import { CloudImage } from '../../components/CloudImage';
 import { printOrder } from '../../utils/print';
 import dayjs from 'dayjs';
@@ -45,6 +45,17 @@ const PurchasePage: React.FC = () => {
   const [timelineLogs, setTimelineLogs] = useState<any[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [currentTimelineOrder, setCurrentTimelineOrder] = useState<string>('');
+
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentForm] = Form.useForm();
+  const [orderLedgers, setOrderLedgers] = useState<FinanceLedger[]>([]);
+
+  const loadOrderLedgers = async (orderId: string) => {
+    try {
+      const all = await financeLedgerDB.getAll();
+      setOrderLedgers(all.filter(l => l.orderId === orderId));
+    } catch (e) {}
+  };
 
   const handleShowTimeline = async (order: PurchaseOrder) => {
     setCurrentTimelineOrder(order.orderNo);
@@ -506,6 +517,9 @@ const PurchasePage: React.FC = () => {
         onCancel={() => { setDetailOrder(null); setEditingInfo(false); }}
         footer={null}
         width={700}
+        afterOpenChange={(open) => {
+          if (open && detailOrder) loadOrderLedgers(detailOrder.id);
+        }}
       >
         {detailOrder && (
           <div>
@@ -578,8 +592,92 @@ const PurchasePage: React.FC = () => {
                 </Form>
               )}
             </div>
+
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text strong>付款明细</Text>
+                {detailOrder.status !== 'draft' && detailOrder.status !== 'cancelled' && detailOrder.paymentStatus !== 'paid' && (
+                  <Button size="small" type="primary" onClick={() => {
+                    const balance = detailOrder.totalAmount - (detailOrder.paidAmount || 0);
+                    paymentForm.setFieldsValue({
+                      amount: balance,
+                      paymentDate: dayjs(),
+                      paymentMethod: 'bank'
+                    });
+                    setPaymentModalOpen(true);
+                  }}>录入付款</Button>
+                )}
+              </div>
+              <Table
+                dataSource={orderLedgers}
+                rowKey="id"
+                size="small"
+                pagination={false}
+                columns={[
+                  { title: '日期', dataIndex: 'paymentDate', render: (v) => dayjs(v).format('YYYY-MM-DD') },
+                  { title: '付款金额', dataIndex: 'amount', render: (v) => <Text type="warning">-¥{Number(v).toFixed(2)}</Text> },
+                  { title: '方式', dataIndex: 'paymentMethod', render: (v) => {
+                    const map: any = { wechat: '微信', alipay: '支付宝', bank: '银行转账', cash: '现金' };
+                    return map[v] || v;
+                  } },
+                  { title: '备注', dataIndex: 'remark' },
+                  { title: '经办人', dataIndex: 'createdBy' },
+                ]}
+              />
+            </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        title="录入付款"
+        open={paymentModalOpen}
+        onCancel={() => setPaymentModalOpen(false)}
+        onOk={async () => {
+          try {
+            const values = await paymentForm.validateFields();
+            await financeLedgerDB.create({
+              type: 'expense',
+              partyId: detailOrder!.supplierId,
+              orderId: detailOrder!.id,
+              amount: values.amount,
+              paymentMethod: values.paymentMethod,
+              paymentDate: values.paymentDate.format('YYYY-MM-DD HH:mm:ss'),
+              remark: values.remark,
+              createdBy: auth.currentUser?.email || 'Admin',
+            });
+            message.success('付款录入成功');
+            setPaymentModalOpen(false);
+            loadOrderLedgers(detailOrder!.id);
+            refreshData();
+            // 刷新订单详情中的部分数据
+            const updated = await purchaseOrderDB.getAll();
+            setDetailOrder(updated.find(o => o.id === detailOrder!.id) || null);
+          } catch (e: any) {
+            if (e.errorFields) return;
+            message.error('付款失败: ' + e.message);
+          }
+        }}
+      >
+        <Form form={paymentForm} layout="vertical">
+          <Form.Item name="amount" label="付款金额" rules={[{ required: true, message: '请输入金额' }]}>
+            <InputNumber min={0.01} max={detailOrder ? detailOrder.totalAmount - (detailOrder.paidAmount || 0) : 9999999} precision={2} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="paymentMethod" label="支付方式" rules={[{ required: true }]}>
+            <Select>
+              <Select.Option value="wechat">微信支付</Select.Option>
+              <Select.Option value="alipay">支付宝</Select.Option>
+              <Select.Option value="bank">银行对公转账</Select.Option>
+              <Select.Option value="cash">现金</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="paymentDate" label="付款日期" rules={[{ required: true }]}>
+            <DatePicker style={{ width: '100%' }} showTime />
+          </Form.Item>
+          <Form.Item name="remark" label="备注说明">
+            <Input.TextArea rows={2} placeholder="如：XX转账" />
+          </Form.Item>
+        </Form>
       </Modal>
 
       <Drawer

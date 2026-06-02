@@ -66,6 +66,8 @@ export interface PurchaseOrder {
   extOrderNo?: string;   // 对方单号
   invoiceNo?: string;    // 相关发票编号
   status: OrderStatus;   // 状态
+  paymentStatus: PaymentStatus;  // 付款状态
+  paidAmount: number;    // 已付金额
   remark?: string;
   items: PurchaseItem[];
   createdAt: string;
@@ -91,6 +93,7 @@ export interface SalesOrder {
   discount: number;      // 折扣金额
   status: OrderStatus;   // 状态
   paymentStatus: PaymentStatus;  // 收款状态
+  paidAmount: number;    // 已收金额
   remark?: string;
   items: SalesItem[];
   createdAt: string;
