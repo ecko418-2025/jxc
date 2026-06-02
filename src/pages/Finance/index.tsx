@@ -232,7 +232,9 @@ export default function Finance() {
     const partyName = selectedParty.name;
     const contact = selectedParty.contact ? `${selectedParty.contact} (${selectedParty.phone || ''})` : (selectedParty.phone || '—');
     const title = `${partyType === 'receivable' ? '客户应收账目对账单' : '供应商应付账目对账单'}`;
-    const typeLabel = partyType === 'receivable' ? '应收余额' : '应付余额';
+    const labelStart = partyType === 'receivable' ? '期初应收余额' : '期初应付余额';
+    const labelChange = partyType === 'receivable' ? '期间应收变动' : '期间应付变动';
+    const labelEnd = partyType === 'receivable' ? '期末应收结余' : '期末应付结余';
 
     const html = `<!DOCTYPE html>
       <html><head><meta charset="utf-8"><title>${title}</title>
@@ -269,15 +271,15 @@ export default function Finance() {
 
       <div class="summary-box">
         <div class="summary-card">
-          <div class="title">期初${typeLabel}</div>
+          <div class="title">${labelStart}</div>
           <div class="value">¥${data.openingBalance.toFixed(2)}</div>
         </div>
         <div class="summary-card">
-          <div class="title">期间发生额</div>
+          <div class="title">${labelChange}</div>
           <div class="value">${(data.closingBalance - data.openingBalance) >= 0 ? '+' : ''}¥${(data.closingBalance - data.openingBalance).toFixed(2)}</div>
         </div>
         <div class="summary-card highlight">
-          <div class="title">期末结余${typeLabel}</div>
+          <div class="title">${labelEnd}</div>
           <div class="value">¥${data.closingBalance.toFixed(2)}</div>
         </div>
       </div>
@@ -652,19 +654,25 @@ export default function Finance() {
               {/* Summary Statistics */}
               <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
                 <Card size="small" style={{ flex: 1, background: '#fafafa' }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>期初余额</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {partyType === 'receivable' ? '期初应收余额' : '期初应付余额'}
+                  </Text>
                   <div style={{ fontSize: 20, fontWeight: 'bold', marginTop: 4 }}>
                     ¥{getStatementData().openingBalance.toFixed(2)}
                   </div>
                 </Card>
                 <Card size="small" style={{ flex: 1, background: '#fafafa' }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>期间变动</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {partyType === 'receivable' ? '期间应收变动' : '期间应付变动'}
+                  </Text>
                   <div style={{ fontSize: 20, fontWeight: 'bold', marginTop: 4, color: (getStatementData().closingBalance - getStatementData().openingBalance) >= 0 ? '#ef4444' : '#22c55e' }}>
                     {(getStatementData().closingBalance - getStatementData().openingBalance) >= 0 ? '+' : ''}¥{(getStatementData().closingBalance - getStatementData().openingBalance).toFixed(2)}
                   </div>
                 </Card>
                 <Card size="small" style={{ flex: 1, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>期末结余</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {partyType === 'receivable' ? '期末应收结余' : '期末应付结余'}
+                  </Text>
                   <div style={{ fontSize: 20, fontWeight: 'bold', marginTop: 4, color: '#1d4ed8' }}>
                     ¥{getStatementData().closingBalance.toFixed(2)}
                   </div>
