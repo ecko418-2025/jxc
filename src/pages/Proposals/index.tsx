@@ -374,8 +374,8 @@ const ProposalsPage: React.FC = () => {
                 { 
                   title: '客户备注',
                   dataIndex: '_remark',
-                  width: 200,
-                  render: (text, record) => <Input placeholder="添加备注" value={text} onChange={(e) => handleRemarkChange(record.id, e.target.value)} />
+                  width: 130,
+                  render: (text, record) => <Input value={text} onChange={(e) => handleRemarkChange(record.id, e.target.value)} />
                 },
                 {
                   title: '图片',
