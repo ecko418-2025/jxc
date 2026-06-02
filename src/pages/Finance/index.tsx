@@ -526,7 +526,7 @@ export default function Finance() {
                 ) },
                 { title: '信用额度', dataIndex: 'creditLimit', key: 'creditLimit', render: (v) => v ? `¥${v}` : '无限制' },
                 { title: '操作', key: 'action', render: (_, r) => (
-                  <Button size="small" type="primary" ghost onClick={() => { setSelectedParty(r); setPartyType('receivable'); setStatementModalOpen(true); }}>
+                  <Button size="small" type="link" style={{ padding: 0 }} onClick={() => { setSelectedParty(r); setPartyType('receivable'); setStatementModalOpen(true); }}>
                     对账单
                   </Button>
                 ) }
@@ -550,7 +550,7 @@ export default function Finance() {
                 { title: '历史总已付款', dataIndex: 'totalPaid', key: 'totalPaid', render: (v) => <Text type="warning">¥{Number(v).toFixed(2)}</Text> },
                 { title: '当前欠款', dataIndex: 'balance', key: 'balance', render: (v) => <Text strong type={v > 0 ? 'danger' : 'secondary'}>¥{Number(v).toFixed(2)}</Text> },
                 { title: '操作', key: 'action', render: (_, r) => (
-                  <Button size="small" type="primary" ghost onClick={() => { setSelectedParty(r); setPartyType('payable'); setStatementModalOpen(true); }}>
+                  <Button size="small" type="link" style={{ padding: 0 }} onClick={() => { setSelectedParty(r); setPartyType('payable'); setStatementModalOpen(true); }}>
                     对账单
                   </Button>
                 ) }
