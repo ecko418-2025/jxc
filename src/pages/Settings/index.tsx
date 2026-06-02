@@ -3,7 +3,7 @@
 // ========================================
 
 import React, { useState, useEffect } from 'react';
-import { Card, Typography, Row, Col, Statistic, Button, message, Space, Upload, Alert, Modal, Spin, Table, Tag } from 'antd';
+import { Card, Typography, Row, Col, Statistic, Button, message, Space, Upload, Alert, Modal, Spin, Table, Tag, Input } from 'antd';
 import {
   DownloadOutlined, UploadOutlined, DeleteOutlined,
   DatabaseOutlined, ExclamationCircleOutlined,
@@ -23,6 +23,7 @@ const SettingsPage: React.FC = () => {
   const [salesList, setSalesList] = useState<any[]>([]);
   const [purchaseList, setPurchaseList] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [searchText, setSearchText] = useState('');
   const [stats, setStats] = useState({
     products: 0,
     categories: 0,
@@ -147,6 +148,66 @@ const SettingsPage: React.FC = () => {
   };
 
 
+
+  const getDisplayId = (id: string) => {
+    if (!id) return '';
+    const product = productsList.find(p => p.id === id);
+    if (product) return `[${product.code}] ${product.name}`;
+    const sale = salesList.find(s => s.id === id);
+    if (sale) return `[${sale.orderNumber}]`;
+    const purch = purchaseList.find(p => p.id === id);
+    if (purch) return `[${purch.orderNumber}]`;
+    return id;
+  };
+  
+  const getActionName = (type: string) => {
+    const actionMap: Record<string, string> = {
+      'createSalesOrder': '新建销售单',
+      'updateSalesOrder': '修改销售单',
+      'deleteSalesOrder': '删除销售单',
+      'confirmSalesOrder': '确认出库',
+      'confirmSalesShipment': '确认出库',
+      'createPurchaseOrder': '新建采购单',
+      'updatePurchaseOrder': '修改采购单',
+      'deletePurchaseOrder': '删除采购单',
+      'confirmPurchaseOrder': '确认入库',
+      'confirmPurchaseReceipt': '确认入库',
+      'createProduct': '添加产品',
+      'updateProduct': '修改产品',
+      'deleteProduct': '删除产品',
+      'adjustInventoryStock': '库存调整',
+      'createCategory': '添加分类',
+      'updateCategory': '修改分类',
+      'deleteCategory': '删除分类',
+      'createSupplier': '添加供应商',
+      'createCustomer': '添加客户'
+    };
+    return actionMap[type] || type;
+  };
+
+  const filteredLogs = logs.filter(log => {
+    if (!searchText) return true;
+    const lowerSearch = searchText.toLowerCase();
+    
+    // Check user
+    if (log.user_name && log.user_name.toLowerCase().includes(lowerSearch)) return true;
+    
+    // Check action
+    if (getActionName(log.action_type).toLowerCase().includes(lowerSearch)) return true;
+    
+    // Check message
+    if (log.message && log.message.toLowerCase().includes(lowerSearch)) return true;
+    
+    // Check display ID
+    const id = log.payload?.id || log.payload?.productId;
+    if (id) {
+      const displayId = getDisplayId(id).toLowerCase();
+      if (displayId.includes(lowerSearch)) return true;
+    }
+    
+    return false;
+  });
+
   const columns = [
     {
       title: '操作时间',
@@ -167,30 +228,7 @@ const SettingsPage: React.FC = () => {
       dataIndex: 'action_type',
       key: 'action_type',
       width: 150,
-      render: (text: string) => {
-        const actionMap: Record<string, string> = {
-          'createSalesOrder': '新建销售单',
-          'updateSalesOrder': '修改销售单',
-          'deleteSalesOrder': '删除销售单',
-          'confirmSalesOrder': '确认出库',
-          'confirmSalesShipment': '确认出库',
-          'createPurchaseOrder': '新建采购单',
-          'updatePurchaseOrder': '修改采购单',
-          'deletePurchaseOrder': '删除采购单',
-          'confirmPurchaseOrder': '确认入库',
-          'confirmPurchaseReceipt': '确认入库',
-          'createProduct': '添加产品',
-          'updateProduct': '修改产品',
-          'deleteProduct': '删除产品',
-          'adjustInventoryStock': '库存调整',
-          'createCategory': '添加分类',
-          'updateCategory': '修改分类',
-          'deleteCategory': '删除分类',
-          'createSupplier': '添加供应商',
-          'createCustomer': '添加客户'
-        };
-        return <Tag color="cyan">{actionMap[text] || text}</Tag>;
-      }
+      render: (text: string) => <Tag color="cyan">{getActionName(text)}</Tag>
     },
     {
       title: '详细说明',
@@ -210,24 +248,7 @@ const SettingsPage: React.FC = () => {
           displayMsg = displayMsg.replace(id, '');
         }
 
-        let displayId = id;
-        if (id) {
-          const product = productsList.find(p => p.id === id);
-          if (product) {
-            displayId = `[${product.code}] ${product.name}`;
-          } else {
-            const sale = salesList.find(s => s.id === id);
-            if (sale) {
-              displayId = `[${sale.orderNumber}]`;
-            } else {
-              const purch = purchaseList.find(p => p.id === id);
-              if (purch) {
-                displayId = `[${purch.orderNumber}]`;
-              }
-            }
-          }
-        }
-        
+        const displayId = getDisplayId(id);
         return (
           <Space direction="vertical" size="small">
             <Text strong>{displayMsg}</Text>
@@ -353,8 +374,17 @@ const SettingsPage: React.FC = () => {
               showIcon
               style={{ marginBottom: 16 }}
             />
+            <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+              <Input.Search
+                placeholder="搜索单号、产品名、操作动作、操作人..."
+                allowClear
+                onSearch={val => setSearchText(val)}
+                onChange={e => setSearchText(e.target.value)}
+                style={{ width: 350 }}
+              />
+            </div>
             <Table
-              dataSource={logs}
+              dataSource={filteredLogs}
               columns={columns}
               rowKey="id"
               pagination={{ defaultPageSize: 10, showSizeChanger: true }}
