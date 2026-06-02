@@ -13,6 +13,7 @@ import {
   TeamOutlined,
   BankOutlined,
   BarChartOutlined,
+  FileDoneOutlined,
   SettingOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -34,6 +35,7 @@ const menuItems = [
   { key: '/suppliers', icon: <TeamOutlined />, label: '供应商' },
   { key: '/customers', icon: <BankOutlined />, label: '客户管理' },
   { key: '/reports', icon: <BarChartOutlined />, label: '数据报表' },
+  { key: '/proposals', icon: <FileDoneOutlined />, label: '投标标书' },
   { key: '/settings', icon: <SettingOutlined />, label: '系统设置' },
 ];
 

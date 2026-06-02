@@ -15,6 +15,7 @@ import InventoryPage from './pages/Inventory';
 import SuppliersPage from './pages/Suppliers';
 import CustomersPage from './pages/Customers';
 import ReportsPage from './pages/Reports';
+import ProposalsPage from './pages/Proposals';
 import SettingsPage from './pages/Settings';
 import { initCloudBase, auth } from './database/db';
 import LoginPage from './pages/Login';
@@ -95,6 +96,7 @@ const App: React.FC = () => {
             <Route path="/suppliers" element={<SuppliersPage />} />
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/proposals" element={<ProposalsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>
