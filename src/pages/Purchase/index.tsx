@@ -607,17 +607,15 @@ const PurchasePage: React.FC = () => {
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <Text strong>付款明细</Text>
-                {detailOrder.status !== 'draft' && detailOrder.status !== 'cancelled' && detailOrder.paymentStatus !== 'paid' && (
-                  <Button size="small" type="primary" onClick={() => {
-                    const balance = detailOrder.totalAmount - (detailOrder.paidAmount || 0);
-                    paymentForm.setFieldsValue({
-                      amount: balance,
-                      paymentDate: dayjs(),
-                      paymentMethod: 'bank'
-                    });
-                    setPaymentModalOpen(true);
-                  }}>录入付款</Button>
-                )}
+                <Button size="small" type="primary" onClick={() => {
+                  const balance = detailOrder.totalAmount - (detailOrder.paidAmount || 0);
+                  paymentForm.setFieldsValue({
+                    amount: balance > 0 ? balance : 0,
+                    paymentDate: dayjs(),
+                    paymentMethod: 'bank'
+                  });
+                  setPaymentModalOpen(true);
+                }}>录入付款</Button>
               </div>
               <Table
                 dataSource={orderLedgers}
@@ -737,11 +735,11 @@ const PurchasePage: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', paddingRight: 32 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontSize: 16, fontWeight: 500 }}>付款明细 - {currentLedgerOrder?.orderNo}</span>
-              {currentLedgerOrder && currentLedgerOrder.status !== 'draft' && currentLedgerOrder.status !== 'cancelled' && currentLedgerOrder.paymentStatus !== 'paid' && (
+              {currentLedgerOrder && (
                 <Button size="small" type="primary" onClick={() => {
                   const balance = currentLedgerOrder.totalAmount - (currentLedgerOrder.paidAmount || 0);
                   paymentForm.setFieldsValue({
-                    amount: balance,
+                    amount: balance > 0 ? balance : 0,
                     paymentDate: dayjs(),
                     paymentMethod: 'bank'
                   });
