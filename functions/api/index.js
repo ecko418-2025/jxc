@@ -668,7 +668,19 @@ exports.main = async (event, context) => {
 
       case 'getFinanceLedgers': {
         const [rows] = await pool.query('SELECT * FROM finance_ledgers ORDER BY payment_date DESC, created_at DESC LIMIT 500');
-        await logAudit(pool, action, payload); return { code: 200, data: rows };
+        const mappedRows = rows.map(r => ({
+          id: r.id,
+          type: r.type,
+          partyId: r.party_id,
+          orderId: r.order_id,
+          amount: r.amount,
+          paymentMethod: r.payment_method,
+          paymentDate: r.payment_date,
+          remark: r.remark,
+          createdBy: r.created_by,
+          createdAt: r.created_at
+        }));
+        await logAudit(pool, action, payload); return { code: 200, data: mappedRows };
       }
 
       case 'createFinanceLedger': {
