@@ -292,6 +292,8 @@ exports.main = async (event, context) => {
           order.orderNo = order.order_no;
           order.orderDate = order.order_date;
           order.totalAmount = parseFloat(order.total_amount);
+          order.paidAmount = parseFloat(order.paid_amount || 0);
+          order.paymentStatus = order.payment_status;
           order.extOrderNo = order.ext_order_no;
           order.invoiceNo = order.invoice_no;
         }
@@ -397,6 +399,7 @@ exports.main = async (event, context) => {
           order.orderNo = order.order_no;
           order.orderDate = order.order_date;
           order.totalAmount = parseFloat(order.total_amount);
+          order.paidAmount = parseFloat(order.paid_amount || 0);
           order.paymentStatus = order.payment_status;
           order.extOrderNo = order.ext_order_no;
           order.invoiceNo = order.invoice_no;
