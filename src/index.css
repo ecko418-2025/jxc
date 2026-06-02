@@ -412,3 +412,41 @@ body {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(139, 92, 246, 0.08)) !important;
   border-color: rgba(168, 85, 247, 0.2) !important;
 }
+
+/* Print Styles */
+@media print {
+  body, .ant-layout, .ant-card, #root {
+    background: white !important;
+    color: black !important;
+  }
+  .ant-layout-sider, .ant-layout-header, .hide-on-print {
+    display: none !important;
+  }
+  .ant-card {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  .ant-table-thead > tr > th {
+    background: #f0f0f0 !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .ant-table-tbody > tr > td {
+    color: black !important;
+    border-bottom: 1px solid #ddd !important;
+  }
+  .ant-input {
+    border: none !important;
+    background: transparent !important;
+    color: black !important;
+    padding: 0 !important;
+  }
+  .ant-typography {
+    color: black !important;
+  }
+  .ant-table-selection-column {
+    display: none !important;
+  }
+}

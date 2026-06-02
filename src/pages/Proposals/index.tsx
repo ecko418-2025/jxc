@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Button, Space, Typography, Popconfirm, message, Upload, Select, Input } from 'antd';
-import { DownloadOutlined, UploadOutlined, DeleteOutlined, FileDoneOutlined, ArrowUpOutlined, ArrowDownOutlined, MenuOutlined } from '@ant-design/icons';
+import { DownloadOutlined, UploadOutlined, DeleteOutlined, FileDoneOutlined, ArrowUpOutlined, ArrowDownOutlined, MenuOutlined, PrinterOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import { productDB, categoryDB } from '../../database/db';
 import type { Product, Category } from '../../database/types';
@@ -266,7 +266,7 @@ const ProposalsPage: React.FC = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <Title level={4} style={{ margin: 0 }}><FileDoneOutlined /> 投标标书制单</Title>
-        <Space>
+        <Space className="hide-on-print">
           <Text type="secondary">
             {selectedItems.length > 0 ? `草稿已自动缓存，共 ${selectedItems.length} 款产品` : '暂无数据'}
           </Text>
@@ -284,11 +284,14 @@ const ProposalsPage: React.FC = () => {
           <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport} disabled={selectedItems.length === 0}>
             下载报表 (Excel)
           </Button>
+          <Button type="default" icon={<PrinterOutlined />} onClick={() => window.print()} disabled={selectedItems.length === 0}>
+            打印 / 导出 PDF
+          </Button>
         </Space>
       </div>
 
       <Card style={{ marginBottom: 24 }}>
-        <div style={{ marginBottom: 16, display: 'flex', gap: 16 }}>
+        <div style={{ marginBottom: 16, display: 'flex', gap: 16 }} className="hide-on-print">
           <Select
             showSearch
             placeholder="请输入系统产品编号 或 产品名称快速添加"
@@ -337,6 +340,7 @@ const ProposalsPage: React.FC = () => {
                 {
                   key: 'sort',
                   width: 50,
+                  className: 'hide-on-print',
                 },
                 {
                   title: '图片',
@@ -364,6 +368,7 @@ const ProposalsPage: React.FC = () => {
                 {
                   title: '操作',
                   width: 80,
+                  className: 'hide-on-print',
                   render: (_, record, index) => (
                     <Space>
                       <Button type="text" icon={<ArrowUpOutlined />} size="small" disabled={index === 0} onClick={() => handleMove(index, 'up')} />
