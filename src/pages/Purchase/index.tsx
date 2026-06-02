@@ -497,7 +497,7 @@ const PurchasePage: React.FC = () => {
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 32 }}>
             <span>采购单详情 - {detailOrder?.orderNo}</span>
-            <Button size="small" type="primary" ghost icon={<PrinterOutlined />} onClick={() => detailOrder && printOrder(detailOrder, 'purchase', { products, parties: suppliers })}>
+            <Button size="small" type="primary" icon={<PrinterOutlined />} onClick={() => detailOrder && printOrder(detailOrder, 'purchase', { products, parties: suppliers })}>
               打印预览
             </Button>
           </div>

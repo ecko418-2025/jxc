@@ -531,7 +531,7 @@ const SalesPage: React.FC = () => {
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 32 }}>
             <span>销售单详情 - {detailOrder?.orderNo}</span>
-            <Button size="small" type="primary" ghost icon={<PrinterOutlined />} onClick={() => detailOrder && printOrder(detailOrder, 'sales', { products, parties: customers })}>
+            <Button size="small" type="primary" icon={<PrinterOutlined />} onClick={() => detailOrder && printOrder(detailOrder, 'sales', { products, parties: customers })}>
               打印预览
             </Button>
           </div>
