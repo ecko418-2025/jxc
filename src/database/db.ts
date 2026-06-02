@@ -232,3 +232,9 @@ export const dataUtils = {
     console.warn("clearAll disabled");
   },
 };
+
+export const auditDB = {
+  getList: async () => {
+    return callApi('getAuditLogs');
+  }
+};

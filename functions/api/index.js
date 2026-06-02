@@ -22,6 +22,52 @@ const paymentStatusMap = {
   refunded: '已退款'
 };
 
+
+async function logAudit(pool, action, payload) {
+  const readActions = [
+    'getCategories', 'getProducts', 'getSuppliers', 'getCustomers', 
+    'getPurchaseOrders', 'getSalesOrders', 'getInventoryLogs', 
+    'getDashboardStats', 'getAuditLogs', 'migrate', 'getOrderLogs'
+  ];
+  if (readActions.includes(action) || !action) return;
+
+  let message = `执行了操作: ${action}`;
+  
+  if (action === 'createSalesOrder') message = `提交了新的销售单号: ${payload.id}`;
+  if (action === 'updateSalesOrder') message = `更新了销售单: ${payload.id}`;
+  if (action === 'deleteSalesOrder') message = `删除了销售单: ${payload.id}`;
+  if (action === 'confirmSalesOrder') message = `确认了销售单出库: ${payload.id}`;
+  
+  if (action === 'createPurchaseOrder') message = `提交了新的采购单号: ${payload.id}`;
+  if (action === 'updatePurchaseOrder') message = `更新了采购单: ${payload.id}`;
+  if (action === 'deletePurchaseOrder') message = `删除了采购单: ${payload.id}`;
+  if (action === 'confirmPurchaseOrder') message = `确认了某笔采购入库: ${payload.id}`;
+  
+  if (action === 'createProduct') message = `录入了新产品: ${payload.name || payload.id}`;
+  if (action === 'updateProduct') message = `修改了产品信息: ${payload.id}`;
+  if (action === 'deleteProduct') message = `删除了产品: ${payload.id}`;
+  
+  if (action === 'updateInventory') message = `调整了某个单品的库存: ${payload.productId} (变动 ${payload.quantity})`;
+  
+  if (action === 'createCategory') message = `创建了分类: ${payload.name}`;
+  if (action === 'updateCategory') message = `更新了分类`;
+  if (action === 'deleteCategory') message = `删除了分类`;
+  
+  if (action === 'createSupplier') message = `添加了供应商: ${payload.name}`;
+  if (action === 'createCustomer') message = `添加了客户: ${payload.name}`;
+  
+  const user = '系统管理员';
+
+  try {
+    await pool.query(
+      'INSERT INTO audit_logs (id, user_name, action_type, message, payload) VALUES (?, ?, ?, ?, ?)',
+      [crypto.randomUUID(), user, action, message, JSON.stringify(payload)]
+    );
+  } catch (err) {
+    console.error('Failed to write audit log:', err);
+  }
+}
+
 exports.main = async (event, context) => {
   // 1. 初始化数据库连接池 (如果在热启动期间已有连接池，则复用)
   if (!pool) {
@@ -48,13 +94,28 @@ exports.main = async (event, context) => {
   }
 
   try {
+    let result;
     switch (action) {
       // =============== Categories ===============
       case 'getCategories': {
         const [rows] = await pool.query('SELECT * FROM categories ORDER BY created_at DESC');
-        return { code: 200, data: rows.map(r => ({ ...r, parentId: r.parent_id })) };
+        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, parentId: r.parent_id })) };
       }
       case 'migrate': {
+
+        try {
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS audit_logs (
+              id VARCHAR(36) PRIMARY KEY,
+              user_name VARCHAR(100),
+              action_type VARCHAR(100),
+              message VARCHAR(255),
+              payload JSON,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+        } catch(e){}
+
         try {
           await pool.query("ALTER TABLE purchase_orders ADD COLUMN ext_order_no VARCHAR(100) DEFAULT '' AFTER status;");
         } catch(e){}
@@ -64,7 +125,7 @@ exports.main = async (event, context) => {
         try {
           await pool.query("ALTER TABLE products ADD COLUMN image_url VARCHAR(500) DEFAULT '' AFTER min_stock;");
         } catch(e){}
-        return { code: 200, message: 'Migrated' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Migrated' };
       }
       case 'createCategory': {
         const { code, name, parentId, description } = payload;
@@ -73,19 +134,19 @@ exports.main = async (event, context) => {
           'INSERT INTO categories (id, code, name, parent_id, description) VALUES (?, ?, ?, ?, ?)',
           [id, code, name, parentId || null, description || '']
         );
-        return { code: 200, message: 'Success', data: { id } };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success', data: { id } };
       }
       case 'updateCategory': {
         const { id, ...updateFields } = payload;
-        if (Object.keys(updateFields).length === 0) return { code: 200 };
+        if (Object.keys(updateFields).length === 0) await logAudit(pool, action, payload); return { code: 200 };
         const setClause = Object.keys(updateFields).map(k => `${k.replace('parentId', 'parent_id')} = ?`).join(', ');
         const values = Object.values(updateFields);
         await pool.query(`UPDATE categories SET ${setClause} WHERE id = ?`, [...values, id]);
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'deleteCategory': {
         await pool.query('DELETE FROM categories WHERE id = ?', [payload.id]);
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
 
       // =============== Products ===============
@@ -100,7 +161,7 @@ exports.main = async (event, context) => {
           imageUrl: p.image_url,
           active: p.active === 1
         }));
-        return { code: 200, data: products };
+        await logAudit(pool, action, payload); return { code: 200, data: products };
       }
       case 'createProduct': {
         const { sku, name, categoryId, unit, spec, brand, purchasePrice, salePrice, minStock, active, imageUrl } = payload;
@@ -112,7 +173,7 @@ exports.main = async (event, context) => {
           [id, sku, name, categoryId, unit, spec, brand, purchasePrice, salePrice, minStock, active ? 1 : 0, imageUrl || '']
         );
         await pool.query('INSERT IGNORE INTO inventory (product_id, current_qty) VALUES (?, 0)', [id]);
-        return { code: 200, message: 'Success', data: { id } };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success', data: { id } };
       }
       case 'bulkCreateProducts': {
         const { products } = payload;
@@ -126,7 +187,7 @@ exports.main = async (event, context) => {
           );
           await pool.query('INSERT IGNORE INTO inventory (product_id, current_qty) VALUES (?, 0)', [id]);
         }
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'updateProduct': {
         const { id, ...rest } = payload;
@@ -142,17 +203,17 @@ exports.main = async (event, context) => {
           const values = Object.values(updateFields);
           await pool.query(`UPDATE products SET ${setClause} WHERE id = ?`, [...values, id]);
         }
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'deleteProduct': {
         await pool.query('DELETE FROM products WHERE id = ?', [payload.id]);
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
 
       // =============== Suppliers ===============
       case 'getSuppliers': {
         const [rows] = await pool.query('SELECT * FROM suppliers ORDER BY created_at DESC');
-        return { code: 200, data: rows.map(r => ({ ...r, bankAccount: r.bank_account })) };
+        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, bankAccount: r.bank_account })) };
       }
       case 'createSupplier': {
         const { name, contact, phone, address, bankAccount, remark } = payload;
@@ -161,7 +222,7 @@ exports.main = async (event, context) => {
           'INSERT INTO suppliers (id, name, contact, phone, address, bank_account, remark) VALUES (?, ?, ?, ?, ?, ?, ?)',
           [id, name, contact, phone, address, bankAccount || '', remark || '']
         );
-        return { code: 200, message: 'Success', data: { id } };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success', data: { id } };
       }
       case 'updateSupplier': {
         const { id, ...rest } = payload;
@@ -172,17 +233,17 @@ exports.main = async (event, context) => {
           const values = Object.values(updateFields);
           await pool.query(`UPDATE suppliers SET ${setClause} WHERE id = ?`, [...values, id]);
         }
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'deleteSupplier': {
         await pool.query('DELETE FROM suppliers WHERE id = ?', [payload.id]);
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
 
       // =============== Customers ===============
       case 'getCustomers': {
         const [rows] = await pool.query('SELECT * FROM customers ORDER BY created_at DESC');
-        return { code: 200, data: rows.map(r => ({ ...r, creditLimit: r.credit_limit ? parseFloat(r.credit_limit) : 0 })) };
+        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, creditLimit: r.credit_limit ? parseFloat(r.credit_limit) : 0 })) };
       }
       case 'createCustomer': {
         const { name, contact, phone, address, level, creditLimit, remark } = payload;
@@ -191,7 +252,7 @@ exports.main = async (event, context) => {
           'INSERT INTO customers (id, name, contact, phone, address, level, credit_limit, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
           [id, name, contact, phone, address, level, creditLimit || 0, remark || '']
         );
-        return { code: 200, message: 'Success', data: { id } };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success', data: { id } };
       }
       case 'updateCustomer': {
         const { id, ...rest } = payload;
@@ -202,11 +263,11 @@ exports.main = async (event, context) => {
           const values = Object.values(updateFields);
           await pool.query(`UPDATE customers SET ${setClause} WHERE id = ?`, [...values, id]);
         }
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'deleteCustomer': {
         await pool.query('DELETE FROM customers WHERE id = ?', [payload.id]);
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
 
       // =============== Purchase Orders ===============
@@ -222,7 +283,7 @@ exports.main = async (event, context) => {
           order.extOrderNo = order.ext_order_no;
           order.invoiceNo = order.invoice_no;
         }
-        return { code: 200, data: orders };
+        await logAudit(pool, action, payload); return { code: 200, data: orders };
       }
       case 'createPurchaseOrder': {
         const { supplierId, orderDate, totalAmount, status, extOrderNo, invoiceNo, remark, items } = payload;
@@ -241,25 +302,25 @@ exports.main = async (event, context) => {
           }
         }
         await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'create', '创建了采购单', payload.operator || '系统']);
-        return { code: 200, message: 'Success', data: { id } };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success', data: { id } };
       }
       case 'deletePurchaseOrder': {
         await pool.query('DELETE FROM purchase_items WHERE order_id = ?', [payload.id]);
         await pool.query('DELETE FROM purchase_orders WHERE id = ?', [payload.id]);
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'updatePurchaseOrderInfo': {
         const { id, extOrderNo, invoiceNo, remark, operator } = payload;
         await pool.query('UPDATE purchase_orders SET ext_order_no = ?, invoice_no = ?, remark = ? WHERE id = ?', [extOrderNo, invoiceNo || '', remark, id]);
         await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'update_info', `修改了订单信息 (发票编号/对方单号/备注)`, operator || '系统']);
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'updatePurchaseOrder': {
         if (payload.status) {
           await pool.query('UPDATE purchase_orders SET status = ? WHERE id = ?', [payload.status, payload.id]);
           await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), payload.id, 'purchase', 'update_status', `更新了采购单状态为: ${orderStatusMap[payload.status] || payload.status}`, payload.operator || '系统']);
         }
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'confirmPurchaseReceipt': {
         const { id, operator } = payload;
@@ -305,7 +366,7 @@ exports.main = async (event, context) => {
           
           await connection.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'purchase', 'update_status', '确认入库 (更新订单状态为: 已入库)', operator || '系统']);
           await connection.commit();
-          return { code: 200, message: 'Success' };
+          await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
         } catch (e) {
           await connection.rollback();
           throw e;
@@ -328,7 +389,7 @@ exports.main = async (event, context) => {
           order.extOrderNo = order.ext_order_no;
           order.invoiceNo = order.invoice_no;
         }
-        return { code: 200, data: orders };
+        await logAudit(pool, action, payload); return { code: 200, data: orders };
       }
       case 'createSalesOrder': {
         const { customerId, orderDate, totalAmount, discount, status, paymentStatus, extOrderNo, invoiceNo, remark, items } = payload;
@@ -347,18 +408,18 @@ exports.main = async (event, context) => {
           }
         }
         await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'create', '创建了销售单', payload.operator || '系统']);
-        return { code: 200, message: 'Success', data: { id } };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success', data: { id } };
       }
       case 'deleteSalesOrder': {
         await pool.query('DELETE FROM sales_items WHERE order_id = ?', [payload.id]);
         await pool.query('DELETE FROM sales_orders WHERE id = ?', [payload.id]);
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'updateSalesOrderInfo': {
         const { id, extOrderNo, invoiceNo, remark, operator } = payload;
         await pool.query('UPDATE sales_orders SET ext_order_no = ?, invoice_no = ?, remark = ? WHERE id = ?', [extOrderNo, invoiceNo || '', remark, id]);
         await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_info', `修改了订单信息 (发票编号/对方单号/备注)`, operator || '系统']);
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'updateSalesOrder': {
         const { id, status, paymentStatus } = payload;
@@ -382,7 +443,7 @@ exports.main = async (event, context) => {
             await pool.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_payment', `更新了收款状态为: ${paymentStatusMap[paymentStatus] || paymentStatus}`, payload.operator || '系统']);
           }
         }
-        return { code: 200, message: 'Success' };
+        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'confirmSalesShipment': {
         const { id, operator } = payload;
@@ -429,7 +490,7 @@ exports.main = async (event, context) => {
           
           await connection.query('INSERT INTO order_logs (id, order_id, order_type, action, detail, operator) VALUES (?, ?, ?, ?, ?, ?)', [crypto.randomUUID(), id, 'sales', 'update_status', '确认出库 (更新订单状态为: 已发货)', operator || '系统']);
           await connection.commit();
-          return { code: 200, message: 'Success' };
+          await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
         } catch (e) {
           await connection.rollback();
           return { code: 400, message: e.message };
@@ -441,7 +502,7 @@ exports.main = async (event, context) => {
       // =============== Inventory ===============
       case 'getInventory': {
         const [rows] = await pool.query('SELECT * FROM inventory');
-        return { code: 200, data: rows.map(r => ({ productId: r.product_id, quantity: r.current_qty })) };
+        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ productId: r.product_id, quantity: r.current_qty })) };
       }
       case 'getLowStockProducts': {
         const [rows] = await pool.query(`
@@ -454,11 +515,11 @@ exports.main = async (event, context) => {
           product: { id: r.id, sku: r.sku, name: r.name, minStock: r.min_stock },
           inventory: { productId: r.id, quantity: r.current_qty }
         }));
-        return { code: 200, data: result };
+        await logAudit(pool, action, payload); return { code: 200, data: result };
       }
       case 'getInventoryLogs': {
         const [rows] = await pool.query('SELECT * FROM inventory_logs ORDER BY created_at DESC LIMIT 500');
-        return { code: 200, data: rows.map(r => ({ ...r, productId: r.product_id, quantity: r.quantity_change })) };
+        await logAudit(pool, action, payload); return { code: 200, data: rows.map(r => ({ ...r, productId: r.product_id, quantity: r.quantity_change })) };
       }
       case 'getInventoryLogsByProduct': {
         const { productId } = payload;
@@ -531,7 +592,7 @@ exports.main = async (event, context) => {
         const diff = newQty - currentQty;
         
         if (diff === 0) {
-          return { code: 200, message: 'No change needed' };
+          await logAudit(pool, action, payload); return { code: 200, message: 'No change needed' };
         }
         
         const connection = await pool.getConnection();
@@ -547,7 +608,7 @@ exports.main = async (event, context) => {
           );
           
           await connection.commit();
-          return { code: 200, message: 'Stock adjusted successfully' };
+          await logAudit(pool, action, payload); return { code: 200, message: 'Stock adjusted successfully' };
         } catch (e) {
           await connection.rollback();
           throw e;
@@ -556,10 +617,16 @@ exports.main = async (event, context) => {
         }
       }
 
+
+      case 'getAuditLogs': {
+        const [rows] = await pool.query('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100');
+        await logAudit(pool, action, payload); return { code: 200, data: rows };
+      }
+
       case 'getOrderLogs': {
         const { orderId } = payload;
         const [logs] = await pool.query('SELECT * FROM order_logs WHERE order_id = ? ORDER BY created_at DESC', [orderId]);
-        return { code: 200, data: logs };
+        await logAudit(pool, action, payload); return { code: 200, data: logs };
       }
 
       default:

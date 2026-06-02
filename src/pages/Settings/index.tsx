@@ -3,21 +3,23 @@
 // ========================================
 
 import React, { useState, useEffect } from 'react';
-import { Card, Typography, Row, Col, Statistic, Button, message, Space, Upload, Alert, Modal, Spin } from 'antd';
+import { Card, Typography, Row, Col, Statistic, Button, message, Space, Upload, Alert, Modal, Spin, Table, Tag } from 'antd';
 import {
   DownloadOutlined, UploadOutlined, DeleteOutlined,
   DatabaseOutlined, ExclamationCircleOutlined,
   CloudDownloadOutlined, CloudUploadOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import { productDB, categoryDB, supplierDB, customerDB, salesOrderDB, purchaseOrderDB } from '../../database/db';
+import { productDB, categoryDB, supplierDB, customerDB, salesOrderDB, purchaseOrderDB, auditDB } from '../../database/db';
 import { seedDemoData } from '../../database/seed';
 import { exportAllToExcel, restoreFromExcel } from '../../utils/excel';
+import dayjs from 'dayjs';
 
 const { Text, Paragraph } = Typography;
 
 const SettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
+  const [logs, setLogs] = useState<any[]>([]);
   const [stats, setStats] = useState({
     products: 0,
     categories: 0,
@@ -31,13 +33,14 @@ const SettingsPage: React.FC = () => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const [prods, cats, supps, custs, sales, purch] = await Promise.all([
+        const [prods, cats, supps, custs, sales, purch, auditLogs] = await Promise.all([
           productDB.getAll(),
           categoryDB.getAll(),
           supplierDB.getAll(),
           customerDB.getAll(),
           salesOrderDB.getAll(),
           purchaseOrderDB.getAll(),
+          auditDB.getList().catch(() => [])
         ]);
         setStats({
           products: prods.length,
@@ -47,6 +50,7 @@ const SettingsPage: React.FC = () => {
           salesOrders: sales.length,
           purchaseOrders: purch.length,
         });
+        setLogs(auditLogs);
       } catch (err) {
         console.error(err);
       } finally {
@@ -135,6 +139,46 @@ const SettingsPage: React.FC = () => {
       },
     });
   };
+
+
+  const columns = [
+    {
+      title: '操作时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 180,
+      render: (text: string) => dayjs(text).format('YYYY-MM-DD HH:mm:ss')
+    },
+    {
+      title: '操作人',
+      dataIndex: 'user_name',
+      key: 'user_name',
+      width: 150,
+      render: (text: string) => <Tag color="blue">{text}</Tag>
+    },
+    {
+      title: '操作动作',
+      dataIndex: 'action_type',
+      key: 'action_type',
+      width: 150,
+      render: (text: string) => <Text code>{text}</Text>
+    },
+    {
+      title: '详细说明',
+      dataIndex: 'message',
+      key: 'message',
+      render: (text: string, record: any) => (
+        <Space direction="vertical" size="small">
+          <Text strong>{text}</Text>
+          {record.payload && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              ID: {record.payload.id || record.payload.productId || 'N/A'}
+            </Text>
+          )}
+        </Space>
+      )
+    }
+  ];
 
   if (loading) {
     return (
@@ -232,6 +276,32 @@ const SettingsPage: React.FC = () => {
             </Button>
           </Card>
         </Col>
+
+
+        {/* System Security Log */}
+        <Col xs={24}>
+          <Card 
+            title={<Space><DatabaseOutlined style={{ color: '#10b981' }} /> 系统安全日志</Space>} 
+            size="small"
+            style={{ borderColor: 'rgba(16, 185, 129, 0.3)' }}
+          >
+            <Alert
+              message="日志自动记录所有的核心写入操作，用于后续安全审计和行为追溯。"
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+            <Table
+              dataSource={logs}
+              columns={columns}
+              rowKey="id"
+              pagination={{ defaultPageSize: 10, showSizeChanger: true }}
+              scroll={{ x: 800 }}
+              size="small"
+            />
+          </Card>
+        </Col>
+
       </Row>
 
       <Card size="small" style={{ marginTop: 16 }}>

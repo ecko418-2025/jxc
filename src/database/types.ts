@@ -143,3 +143,12 @@ export interface DashboardStats {
   totalProducts: number;
   totalCustomers: number;
 }
+
+export interface AuditLog {
+  id: string;
+  user_name: string;
+  action_type: string;
+  message: string;
+  payload: any;
+  created_at: string;
+}

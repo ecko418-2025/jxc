@@ -22,6 +22,22 @@ async function migrate() {
     console.log("sales_orders skip: " + e.message);
   }
 
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id VARCHAR(36) PRIMARY KEY,
+        user_name VARCHAR(100),
+        action_type VARCHAR(100),
+        message VARCHAR(255),
+        payload JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log("Created audit_logs table");
+  } catch(e) {
+    console.log("audit_logs skip: " + e.message);
+  }
+
   process.exit(0);
 }
 
