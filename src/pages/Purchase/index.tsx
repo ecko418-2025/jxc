@@ -50,6 +50,9 @@ const PurchasePage: React.FC = () => {
   const [paymentForm] = Form.useForm();
   const [orderLedgers, setOrderLedgers] = useState<FinanceLedger[]>([]);
 
+  const [ledgerModalOpen, setLedgerModalOpen] = useState(false);
+  const [currentLedgerOrder, setCurrentLedgerOrder] = useState<PurchaseOrder | null>(null);
+
   const loadOrderLedgers = async (orderId: string) => {
     try {
       const all = await financeLedgerDB.getAll();
@@ -281,10 +284,15 @@ const PurchasePage: React.FC = () => {
       title: '操作',
       width: 180,
       render: (_: unknown, record: PurchaseOrder) => (
-        <Space>
+        <Space wrap>
           <Button size="small" icon={<EyeOutlined />} onClick={() => setDetailOrder(record)}>
             查看
           </Button>
+          <Button size="small" onClick={() => {
+            setCurrentLedgerOrder(record);
+            loadOrderLedgers(record.id);
+            setLedgerModalOpen(true);
+          }}>资金明细</Button>
           {record.status === 'draft' && (
             <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => handleConfirm(record.id)}>
               确认
@@ -714,6 +722,36 @@ const PurchasePage: React.FC = () => {
           </div>
         )}
       </Drawer>
+
+      {/* Payment Ledger Details Modal */}
+      <Modal
+        title={`付款明细 - ${currentLedgerOrder?.orderNo}`}
+        open={ledgerModalOpen}
+        onCancel={() => {
+          setLedgerModalOpen(false);
+          setCurrentLedgerOrder(null);
+        }}
+        footer={null}
+        width={700}
+      >
+        <Table
+          dataSource={orderLedgers}
+          rowKey="id"
+          size="small"
+          pagination={false}
+          locale={{ emptyText: '暂无数据' }}
+          columns={[
+            { title: '日期', dataIndex: 'paymentDate', render: (v) => dayjs(v).format('YYYY-MM-DD HH:mm') },
+            { title: '付款金额', dataIndex: 'amount', render: (v) => <Text type="warning">¥{Number(v).toFixed(2)}</Text> },
+            { title: '方式', dataIndex: 'paymentMethod', render: (v) => {
+              const map: any = { wechat: '微信', alipay: '支付宝', bank: '转账', cash: '现金' };
+              return map[v] || v;
+            } },
+            { title: '备注', dataIndex: 'remark' },
+            { title: '经办人', dataIndex: 'createdBy' },
+          ]}
+        />
+      </Modal>
     </Card>
   );
 };

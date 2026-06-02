@@ -641,6 +641,31 @@ exports.main = async (event, context) => {
         await logAudit(pool, action, payload); return { code: 200, data: logs };
       }
 
+      case 'finance_migrate': {
+        const connection = await pool.getConnection();
+        try {
+          await connection.query(`
+            CREATE TABLE IF NOT EXISTS finance_ledgers (
+              id VARCHAR(36) PRIMARY KEY,
+              type VARCHAR(20),
+              party_id VARCHAR(36),
+              order_id VARCHAR(36),
+              amount DECIMAL(10,2) DEFAULT 0.00,
+              payment_method VARCHAR(50),
+              payment_date DATETIME,
+              remark VARCHAR(255),
+              created_by VARCHAR(50),
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+          try { await connection.query("ALTER TABLE purchase_orders ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0.00 AFTER total_amount;"); } catch(e){}
+          try { await connection.query("ALTER TABLE sales_orders ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0.00 AFTER total_amount;"); } catch(e){}
+          return { code: 200, message: 'Migration successful' };
+        } finally {
+          connection.release();
+        }
+      }
+
       case 'getFinanceLedgers': {
         const [rows] = await pool.query('SELECT * FROM finance_ledgers ORDER BY payment_date DESC, created_at DESC LIMIT 500');
         await logAudit(pool, action, payload); return { code: 200, data: rows };
