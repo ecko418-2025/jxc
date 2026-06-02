@@ -19,6 +19,7 @@ const { Text, Paragraph } = Typography;
 
 const SettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
+  const [productsList, setProductsList] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [stats, setStats] = useState({
     products: 0,
@@ -51,6 +52,7 @@ const SettingsPage: React.FC = () => {
           purchaseOrders: purch.length,
         });
         setLogs(auditLogs);
+        setProductsList(prods);
       } catch (err) {
         console.error(err);
       } finally {
@@ -190,12 +192,25 @@ const SettingsPage: React.FC = () => {
       key: 'message',
       render: (text: string, record: any) => {
         const id = record.payload?.id || record.payload?.productId;
+        
+        // Handle legacy un-translated text
+        let displayMsg = text;
+        if (text === '执行了操作: adjustInventoryStock') displayMsg = '执行了操作: 库存调整';
+        
+        let displayId = id;
+        if (id) {
+          const product = productsList.find(p => p.id === id);
+          if (product) {
+            displayId = `[${product.code}] ${product.name}`;
+          }
+        }
+        
         return (
           <Space direction="vertical" size="small">
-            <Text strong>{text}</Text>
+            <Text strong>{displayMsg}</Text>
             {id && (
               <Text type="secondary" style={{ fontSize: 12 }}>
-                系统编码: {id}
+                关联单据/商品: {displayId}
               </Text>
             )}
           </Space>
