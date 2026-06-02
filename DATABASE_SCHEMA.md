@@ -1,7 +1,7 @@
-# 进销存财务系统 - 数据库与前端字段映射字典
+# 进销存财务系统 - 数据库与前端字段映射字典 (Database Schema & Mapping)
 
-本文档罗列了当前系统所有核心模块的数据库表结构（后端）以及 TypeScript 接口类型（前端）的字段名称映射关系。
-本系统核心遵循 **数据库字段使用 snake_case（下划线命名法）**，**前端实体字段使用 camelCase（驼峰命名法）**的规范。
+本文档罗列了当前系统所有核心模块的数据库表结构（后端 MySQL）以及 TypeScript 接口类型（前端）的字段名称映射关系。
+本系统核心遵循 **数据库字段使用 snake_case（下划线命名法）**，**前端实体字段使用 camelCase（驼峰命名法）** 的规范。
 
 ---
 
@@ -16,6 +16,7 @@
 | 父级分类ID | `parent_id` | `parentId` |
 | 描述 | `description` | `description` |
 | 创建时间 | `created_at` | `createdAt` |
+| 更新时间 | `updated_at` | `updatedAt` |
 
 ### 1.2 商品/产品 (Products)
 | 含义 | 后端数据库 (products) | 前端属性 (Product) |
@@ -33,6 +34,7 @@
 | 启用状态(1/0) | `active` | `active` (boolean) |
 | 图片地址 | `image_url` | `imageUrl` |
 | 创建时间 | `created_at` | `createdAt` |
+| 更新时间 | `updated_at` | `updatedAt` |
 
 ### 1.3 供应商 (Suppliers)
 | 含义 | 后端数据库 (suppliers) | 前端属性 (Supplier) |
@@ -45,6 +47,7 @@
 | 银行账户 | `bank_account` | `bankAccount` |
 | 备注 | `remark` | `remark` |
 | 创建时间 | `created_at` | `createdAt` |
+| 更新时间 | `updated_at` | `updatedAt` |
 
 ### 1.4 客户 (Customers)
 | 含义 | 后端数据库 (customers) | 前端属性 (Customer) |
@@ -58,6 +61,7 @@
 | 信用额度 | `credit_limit` | `creditLimit` |
 | 备注 | `remark` | `remark` |
 | 创建时间 | `created_at` | `createdAt` |
+| 更新时间 | `updated_at` | `updatedAt` |
 
 ---
 
@@ -80,6 +84,7 @@
 | 备注 | `remark` | `remark` |
 | 包含商品 | -(关联sales_items) | `items` (SalesItem[]) |
 | 创建时间 | `created_at` | `createdAt` |
+| 更新时间 | `updated_at` | `updatedAt` |
 
 #### 销售订单子项 (Sales Items)
 | 含义 | 后端数据库 (sales_items) | 前端属性 (SalesItem) |
@@ -107,6 +112,7 @@
 | 备注 | `remark` | `remark` |
 | 包含商品 | -(关联purchase_items) | `items` (PurchaseItem[]) |
 | 创建时间 | `created_at` | `createdAt` |
+| 更新时间 | `updated_at` | `updatedAt` |
 
 #### 采购订单子项 (Purchase Items)
 | 含义 | 后端数据库 (purchase_items) | 前端属性 (PurchaseItem) |
@@ -133,14 +139,14 @@
 | 支付方式 | `payment_method` | `paymentMethod` |
 | 支付日期 | `payment_date` | `paymentDate` |
 | 备注 | `remark` | `remark` |
-| 经办人/录入人 | `created_by` | `createdBy` |
+| 经办人/录入人 UID | `created_by` | `createdBy` |
 | 创建时间 | `created_at` | `createdAt` |
 
 ### 3.2 实时库存总览 (Inventory)
 | 含义 | 后端数据库 (inventory) | 前端属性 (InventoryRecord) |
 |---|---|---|
 | 商品ID | `product_id` | `productId` |
-| 当前库存数 | `current_qty` | `currentQty` |
+| 当前库存数 | `current_qty` | `currentQty` / `quantity` |
 | 最后变动时间 | `last_updated` | `lastUpdated` |
 
 ### 3.3 库存出入库日志 (Inventory Logs)
@@ -153,14 +159,13 @@
 | 变动后结余 | `balance` | `balance` |
 | 关联单据类型 | `ref_type` | `refType` (可选) |
 | 关联单据ID | `ref_id` | `refId` (可选) |
-| 操作人 | `operator` | `operator` |
-| 用户OpenID | `_openid` | - |
+| 操作员 UID | `operator` | `operator` |
 | 创建时间 | `created_at` | `createdAt` |
-| *注: 扩展字段* | -(Join 查询获得) | `poNo`, `poExtNo`, `supplierName`等辅助字段 |
+| *注: 扩展属性* | -(Join 查询或映射获得) | `poNo`, `poExtNo`, `supplierName`, `soNo`, `soExtNo`, `customerName` 等辅助字段 |
 
 ---
 
-## 4. 系统日志 (System Logs)
+## 4. 系统管理与操作日志 (System & Logs)
 
 > 💡 **特别说明**：为了保留原始日志的直接可读性，部分系统级日志实体在前端直接沿用了 `snake_case` 映射，未转换为驼峰命名。
 
@@ -172,7 +177,7 @@
 | 订单类型(sales/purchase)| `order_type` | `order_type` |
 | 操作动作 | `action` | `action` |
 | 详情描述 | `detail` | `detail` |
-| 操作人 | `operator` | `operator` |
+| 操作人 UID | `operator` | `operator` |
 | 发生时间 | `created_at` | `created_at` |
 
 ### 4.2 审计与关键操作日志 (Audit Logs)
@@ -180,7 +185,25 @@
 |---|---|---|
 | 主键ID | `id` | `id` |
 | 操作用户名 | `user_name` | `user_name` |
+| 操作员 UID | `operator_uid` | `operator_uid` |
 | 动作类型 | `action_type` | `action_type` |
 | 消息描述 | `message` | `message` |
 | 携带的业务数据 | `payload` | `payload` |
 | 发生时间 | `created_at` | `created_at` |
+
+### 4.3 用户与权限管理 (Users)
+| 含义 | 后端数据库 (users) | 前端属性 (UserProfile) |
+|---|---|---|
+| 用户 UID | `uid` | `uid` |
+| 登录用户名 | `username` | `username` |
+| 显示姓名 | `display_name` | `displayName` |
+| 系统角色 | `role` | `role` |
+| 创建时间 | `created_at` | `createdAt` |
+| 更新时间 | `updated_at` | `updatedAt` |
+
+### 4.4 单号生成辅助器 (System Counters)
+| 含义 | 后端数据库 (system_counters) | 前端属性 (内部使用) |
+|---|---|---|
+| 单号前缀 | `prefix` | - |
+| 日期标记 | `date_str` | - |
+| 当前计数数值 | `current_value` | - |
