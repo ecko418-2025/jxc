@@ -454,12 +454,15 @@ body {
   }
 }
 @media print {
-  .ant-table-cell {
-    word-break: keep-all !important;
-    white-space: nowrap !important;
+  .ant-table table {
+    table-layout: auto !important;
   }
-  .ant-table-cell:has(.ant-input), .ant-table-cell:nth-child(9) {
+  colgroup {
+    display: none !important;
+  }
+  .ant-table-cell {
     white-space: normal !important;
+    word-break: normal !important;
   }
 }
 @media print {
