@@ -18,7 +18,6 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   BellOutlined,
-  LogoutOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { inventoryDB, auth } from '../database/db';
@@ -197,17 +196,6 @@ const AppLayout: React.FC = () => {
                 </Badge>
               </Tooltip>
             )}
-            
-            <Tooltip title="安全退出">
-              <LogoutOutlined 
-                style={{ fontSize: 18, color: 'var(--error-color)', cursor: 'pointer', transition: 'opacity 0.3s' }} 
-                onClick={async () => {
-                  await auth.signOut();
-                  window.location.reload();
-                }}
-              />
-            </Tooltip>
- 
             <Dropdown
               menu={{ items: dropdownItems }}
               placement="bottomRight"
