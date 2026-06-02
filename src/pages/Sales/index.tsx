@@ -39,6 +39,16 @@ const SalesPage: React.FC = () => {
 
   const [searchParams] = useSearchParams();
   const [searchText, setSearchText] = useState(searchParams.get('search') || '');
+  
+  useEffect(() => {
+    const searchVal = searchParams.get('search');
+    if (searchVal !== null) {
+      setSearchText(searchVal);
+    } else {
+      setSearchText('');
+    }
+  }, [searchParams]);
+
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
 
   const [timelineVisible, setTimelineVisible] = useState(false);

@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { Table, Card, Typography, Tabs, Tag, message, Button, Input, DatePicker, Space } from 'antd';
 import { DeleteOutlined, DownloadOutlined, PrinterOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { financeLedgerDB, customerDB, supplierDB, salesOrderDB, purchaseOrderDB } from '../../database/db';
 import type { FinanceLedger, Customer, Supplier, SalesOrder, PurchaseOrder } from '../../database/types';
 import dayjs from 'dayjs';
@@ -13,6 +14,7 @@ import * as XLSX from 'xlsx';
 const { Title, Text } = Typography;
 
 export default function Finance() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('receivable');
   
   const [ledgers, setLedgers] = useState<FinanceLedger[]>([]);
@@ -259,7 +261,11 @@ export default function Finance() {
               rowKey="id"
               loading={loading}
               columns={[
-                { title: '客户名称', dataIndex: 'name', key: 'name', render: (t) => <Text strong>{t}</Text> },
+                { title: '客户名称', dataIndex: 'name', key: 'name', render: (t) => (
+                  <Button type="link" style={{ padding: 0, fontWeight: 'bold' }} onClick={() => navigate(`/sales?search=${encodeURIComponent(t)}`)}>
+                    {t}
+                  </Button>
+                ) },
                 { title: '联系人', dataIndex: 'contact', key: 'contact' },
                 { title: '有效单据数', dataIndex: 'ordersCount', key: 'ordersCount' },
                 { title: '历史总订货额', dataIndex: 'totalOrdered', key: 'totalOrdered', render: (v) => `¥${Number(v).toFixed(2)}` },
@@ -279,7 +285,11 @@ export default function Finance() {
               rowKey="id"
               loading={loading}
               columns={[
-                { title: '供应商名称', dataIndex: 'name', key: 'name', render: (t) => <Text strong>{t}</Text> },
+                { title: '供应商名称', dataIndex: 'name', key: 'name', render: (t) => (
+                  <Button type="link" style={{ padding: 0, fontWeight: 'bold' }} onClick={() => navigate(`/purchase?search=${encodeURIComponent(t)}`)}>
+                    {t}
+                  </Button>
+                ) },
                 { title: '联系人', dataIndex: 'contact', key: 'contact' },
                 { title: '有效采购单数', dataIndex: 'ordersCount', key: 'ordersCount' },
                 { title: '历史总采购额', dataIndex: 'totalOrdered', key: 'totalOrdered', render: (v) => `¥${Number(v).toFixed(2)}` },
@@ -304,8 +314,23 @@ export default function Finance() {
                   <Tag color={v === 'income' ? 'green' : 'orange'}>{v === 'income' ? '收款 (应收)' : '付款 (应付)'}</Tag>
                 ) },
                 { title: '关联客商', dataIndex: 'partyId', key: 'partyId', render: (v, r) => {
-                  if (r.type === 'income') return customers.find(c => c.id === v)?.name || '未知客户';
-                  return suppliers.find(s => s.id === v)?.name || '未知供应商';
+                  if (r.type === 'income') {
+                    const name = customers.find(c => c.id === v)?.name;
+                    if (!name) return '未知客户';
+                    return (
+                      <Button type="link" style={{ padding: 0 }} onClick={() => navigate(`/sales?search=${encodeURIComponent(name)}`)}>
+                        {name}
+                      </Button>
+                    );
+                  } else {
+                    const name = suppliers.find(s => s.id === v)?.name;
+                    if (!name) return '未知供应商';
+                    return (
+                      <Button type="link" style={{ padding: 0 }} onClick={() => navigate(`/purchase?search=${encodeURIComponent(name)}`)}>
+                        {name}
+                      </Button>
+                    );
+                  }
                 } },
                 { title: '关联订单', dataIndex: 'orderId', key: 'orderId', render: (v, r) => {
                   if (!v) return '—';
