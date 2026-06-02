@@ -327,7 +327,7 @@ const PurchasePage: React.FC = () => {
           .filter(o => {
             if (searchText) {
               const supplier = suppliers.find(s => s.id === o.supplierId)?.name || '';
-              if (!o.id.includes(searchText) && !supplier.includes(searchText)) return false;
+              if (!o.orderNo.toLowerCase().includes(searchText.toLowerCase()) && !supplier.toLowerCase().includes(searchText.toLowerCase()) && !(o.extOrderNo || '').toLowerCase().includes(searchText.toLowerCase()) && !(o.invoiceNo || '').toLowerCase().includes(searchText.toLowerCase())) return false;
             }
             if (dateRange && dateRange[0] && dateRange[1]) {
               if (!dayjs(o.orderDate).isBetween(dateRange[0], dateRange[1], 'day', '[]')) return false;

@@ -355,7 +355,7 @@ const SalesPage: React.FC = () => {
           .filter(o => {
             if (searchText) {
               const customer = customers.find(c => c.id === o.customerId)?.name || '';
-              if (!o.id.includes(searchText) && !customer.includes(searchText)) return false;
+              if (!o.orderNo.toLowerCase().includes(searchText.toLowerCase()) && !customer.toLowerCase().includes(searchText.toLowerCase()) && !(o.extOrderNo || '').toLowerCase().includes(searchText.toLowerCase()) && !(o.invoiceNo || '').toLowerCase().includes(searchText.toLowerCase())) return false;
             }
             if (dateRange && dateRange[0] && dateRange[1]) {
               if (!dayjs(o.orderDate).isBetween(dateRange[0], dateRange[1], 'day', '[]')) return false;
