@@ -258,16 +258,16 @@ const ProposalsPage: React.FC = () => {
             { title: '规格型号', dataIndex: 'spec', width: 120 },
             { title: '单位', dataIndex: 'unit', width: 80 },
             { 
-              title: '客户备注',
-              dataIndex: '_remark',
-              width: 200,
-              render: (text, record) => <Input placeholder="添加备注" value={text} onChange={(e) => handleRemarkChange(record.id, e.target.value)} />
-            },
-            { 
               title: '销售价', 
               dataIndex: 'salePrice', 
               width: 120,
               render: (v) => <Text strong style={{ color: '#22c55e' }}>¥{Number(v).toFixed(2)}</Text>
+            },
+            { 
+              title: '客户备注',
+              dataIndex: '_remark',
+              width: 200,
+              render: (text, record) => <Input placeholder="添加备注" value={text} onChange={(e) => handleRemarkChange(record.id, e.target.value)} />
             },
             {
               title: '操作',
