@@ -4,10 +4,11 @@
 
 import { useState, useEffect } from 'react';
 import { Table, Card, Typography, Tabs, Tag, message, Button, Input, DatePicker, Space } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DownloadOutlined, PrinterOutlined } from '@ant-design/icons';
 import { financeLedgerDB, customerDB, supplierDB, salesOrderDB, purchaseOrderDB } from '../../database/db';
 import type { FinanceLedger, Customer, Supplier, SalesOrder, PurchaseOrder } from '../../database/types';
 import dayjs from 'dayjs';
+import * as XLSX from 'xlsx';
 
 const { Title, Text } = Typography;
 
@@ -121,6 +122,111 @@ export default function Finance() {
     });
   };
 
+  // ------------------------------------------
+  // 获取当前 Tab 可导出的表格行数据
+  // ------------------------------------------
+  const getExportRows = () => {
+    const payMethodMap: any = { wechat: '微信', alipay: '支付宝', bank: '银行转账', cash: '现金' };
+    if (activeTab === 'receivable') {
+      return getARData().map(r => ({
+        '客户名称': r.name,
+        '联系人': r.contact || '',
+        '有效单据数': r.ordersCount,
+        '历史总订货额': Number(r.totalOrdered).toFixed(2),
+        '历史总已收款': Number(r.totalPaid).toFixed(2),
+        '当前欠款': Number(r.balance).toFixed(2),
+      }));
+    }
+    if (activeTab === 'payable') {
+      return getAPData().map(r => ({
+        '供应商名称': r.name,
+        '联系人': r.contact || '',
+        '有效采购单数': r.ordersCount,
+        '历史总采购额': Number(r.totalOrdered).toFixed(2),
+        '历史总已付款': Number(r.totalPaid).toFixed(2),
+        '当前欠款': Number(r.balance).toFixed(2),
+      }));
+    }
+    // ledger
+    return getLedgerData().map(l => {
+      const party = l.type === 'income'
+        ? customers.find(c => c.id === l.partyId)?.name || '未知客户'
+        : suppliers.find(s => s.id === l.partyId)?.name || '未知供应商';
+      const orderNo = l.orderId
+        ? (l.type === 'income'
+            ? salesOrders.find(o => o.id === l.orderId)?.orderNo || l.orderId
+            : purchaseOrders.find(o => o.id === l.orderId)?.orderNo || l.orderId)
+        : '—';
+      return {
+        '日期': dayjs(l.paymentDate).format('YYYY-MM-DD'),
+        '类型': l.type === 'income' ? '收款 (应收)' : '付款 (应付)',
+        '关联客商': party,
+        '关联订单': orderNo,
+        '金额': `${l.type === 'income' ? '+' : '-'}${Number(l.amount).toFixed(2)}`,
+        '支付方式': payMethodMap[l.paymentMethod] || l.paymentMethod || '',
+        '备注': l.remark || '',
+        '经办人': l.createdBy || '',
+      };
+    });
+  };
+
+  const tabNameMap: Record<string, string> = {
+    receivable: '应收账款',
+    payable: '应付账款',
+    ledger: '资金流水',
+  };
+
+  // ------------------------------------------
+  // 下载 Excel
+  // ------------------------------------------
+  const handleDownloadExcel = () => {
+    const rows = getExportRows();
+    if (rows.length === 0) { message.warning('当前无数据可导出'); return; }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, tabNameMap[activeTab]);
+    const fileName = `财务管理_${tabNameMap[activeTab]}_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    message.success('Excel 文件已下载');
+  };
+
+  // ------------------------------------------
+  // 打印 PDF（通过浏览器打印对话框）
+  // ------------------------------------------
+  const handlePrintPDF = () => {
+    const rows = getExportRows();
+    if (rows.length === 0) { message.warning('当前无数据可打印'); return; }
+    const headers = Object.keys(rows[0]);
+    const title = `财务管理 - ${tabNameMap[activeTab]}`;
+    const dateStr = dayjs().format('YYYY-MM-DD HH:mm');
+
+    const html = `<!DOCTYPE html>
+      <html><head><meta charset="utf-8"><title>${title}</title>
+      <style>
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; padding: 24px; color: #333; }
+        h2 { margin: 0 0 4px; }
+        .meta { color: #888; font-size: 13px; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f0f0f0; font-weight: 600; }
+        th, td { border: 1px solid #d9d9d9; padding: 6px 10px; text-align: left; }
+        tr:nth-child(even) { background: #fafafa; }
+        @media print { body { padding: 0; } }
+      </style></head><body>
+      <h2>${title}</h2>
+      <div class="meta">导出时间: ${dateStr} &nbsp;|&nbsp; 共 ${rows.length} 条记录</div>
+      <table><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r => `<tr>${headers.map(h => `<td>${(r as any)[h]}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      </body></html>`;
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+      setTimeout(() => win.print(), 400);
+    }
+  };
+
   return (
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -140,6 +246,8 @@ export default function Finance() {
             onChange={e => setSearchText(e.target.value)}
             style={{ width: 300 }} 
           />
+          <Button icon={<DownloadOutlined />} onClick={handleDownloadExcel}>下载 Excel</Button>
+          <Button icon={<PrinterOutlined />} onClick={handlePrintPDF}>打印 PDF</Button>
         </Space>
       </div>
 
