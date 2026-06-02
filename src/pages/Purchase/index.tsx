@@ -644,12 +644,14 @@ const PurchasePage: React.FC = () => {
         open={paymentModalOpen}
         onCancel={() => setPaymentModalOpen(false)}
         onOk={async () => {
+          const targetOrder = detailOrder || currentLedgerOrder;
+          if (!targetOrder) return;
           try {
             const values = await paymentForm.validateFields();
             await financeLedgerDB.create({
               type: 'expense',
-              partyId: detailOrder!.supplierId,
-              orderId: detailOrder!.id,
+              partyId: targetOrder.supplierId,
+              orderId: targetOrder.id,
               amount: values.amount,
               paymentMethod: values.paymentMethod,
               paymentDate: values.paymentDate.format('YYYY-MM-DD HH:mm:ss'),
@@ -658,11 +660,16 @@ const PurchasePage: React.FC = () => {
             });
             message.success('付款录入成功');
             setPaymentModalOpen(false);
-            loadOrderLedgers(detailOrder!.id);
+            loadOrderLedgers(targetOrder.id);
             refreshData();
             // 刷新订单详情中的部分数据
             const updated = await purchaseOrderDB.getAll();
-            setDetailOrder(updated.find(o => o.id === detailOrder!.id) || null);
+            if (detailOrder) {
+              setDetailOrder(updated.find(o => o.id === detailOrder.id) || null);
+            }
+            if (currentLedgerOrder) {
+              setCurrentLedgerOrder(updated.find(o => o.id === currentLedgerOrder.id) || null);
+            }
           } catch (e: any) {
             if (e.errorFields) return;
             message.error('付款失败: ' + e.message);
@@ -671,7 +678,7 @@ const PurchasePage: React.FC = () => {
       >
         <Form form={paymentForm} layout="vertical">
           <Form.Item name="amount" label="付款金额" rules={[{ required: true, message: '请输入金额' }]}>
-            <InputNumber min={0.01} max={detailOrder ? detailOrder.totalAmount - (detailOrder.paidAmount || 0) : 9999999} precision={2} style={{ width: '100%' }} />
+            <InputNumber min={0.01} max={(detailOrder || currentLedgerOrder) ? (detailOrder || currentLedgerOrder)!.totalAmount - ((detailOrder || currentLedgerOrder)!.paidAmount || 0) : 9999999} precision={2} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="paymentMethod" label="支付方式" rules={[{ required: true }]}>
             <Select>
