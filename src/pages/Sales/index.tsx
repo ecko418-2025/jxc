@@ -9,12 +9,13 @@ import {
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, CheckOutlined, SendOutlined,
-  EyeOutlined, DollarOutlined,
+  EyeOutlined, DollarOutlined, PrinterOutlined
 } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
 import { salesOrderDB, customerDB, productDB, inventoryDB } from '../../database/db';
 import type { SalesOrder, SalesItem, Customer, Product, InventoryRecord } from '../../database/types';
 import { CloudImage } from '../../components/CloudImage';
+import { printOrder } from '../../utils/print';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 dayjs.extend(isBetween);
@@ -527,7 +528,14 @@ const SalesPage: React.FC = () => {
 
       {/* Detail Modal */}
       <Modal
-        title={`销售单详情 - ${detailOrder?.orderNo}`}
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 32 }}>
+            <span>销售单详情 - {detailOrder?.orderNo}</span>
+            <Button size="small" type="primary" ghost icon={<PrinterOutlined />} onClick={() => detailOrder && printOrder(detailOrder, 'sales', { products, parties: customers })}>
+              打印预览
+            </Button>
+          </div>
+        }
         open={!!detailOrder}
         onCancel={() => { setDetailOrder(null); setEditingInfo(false); }}
         footer={null}

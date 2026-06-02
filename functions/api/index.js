@@ -133,7 +133,10 @@ exports.main = async (event, context) => {
       }
       case 'updateCategory': {
         const { id, ...updateFields } = payload;
-        if (Object.keys(updateFields).length === 0) await logAudit(pool, action, payload); return { code: 200 };
+        if (Object.keys(updateFields).length === 0) {
+          await logAudit(pool, action, payload); 
+          return { code: 200 };
+        }
         const setClause = Object.keys(updateFields).map(k => `${k.replace('parentId', 'parent_id')} = ?`).join(', ');
         const values = Object.values(updateFields);
         await pool.query(`UPDATE categories SET ${setClause} WHERE id = ?`, [...values, id]);
@@ -201,8 +204,16 @@ exports.main = async (event, context) => {
         await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'deleteProduct': {
-        await pool.query('DELETE FROM products WHERE id = ?', [payload.id]);
-        await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
+        try {
+          await pool.query('DELETE FROM products WHERE id = ?', [payload.id]);
+          await logAudit(pool, action, payload); 
+          return { code: 200, message: 'Success' };
+        } catch (err) {
+          if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+            throw new Error('无法删除此产品，因为它已存在关联的采购单、销售单或库存记录。若不再使用，请【修改】产品状态为【停用】。');
+          }
+          throw err;
+        }
       }
 
       // =============== Suppliers ===============

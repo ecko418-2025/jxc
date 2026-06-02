@@ -9,12 +9,13 @@ import {
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, CheckOutlined, InboxOutlined,
-  EyeOutlined,
+  EyeOutlined, PrinterOutlined
 } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
 import { purchaseOrderDB, supplierDB, productDB, inventoryDB } from '../../database/db';
 import type { PurchaseOrder, PurchaseItem, Supplier, Product } from '../../database/types';
 import { CloudImage } from '../../components/CloudImage';
+import { printOrder } from '../../utils/print';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 dayjs.extend(isBetween);
@@ -493,7 +494,14 @@ const PurchasePage: React.FC = () => {
 
       {/* Detail Modal */}
       <Modal
-        title={`采购单详情 - ${detailOrder?.orderNo}`}
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 32 }}>
+            <span>采购单详情 - {detailOrder?.orderNo}</span>
+            <Button size="small" type="primary" ghost icon={<PrinterOutlined />} onClick={() => detailOrder && printOrder(detailOrder, 'purchase', { products, parties: suppliers })}>
+              打印预览
+            </Button>
+          </div>
+        }
         open={!!detailOrder}
         onCancel={() => { setDetailOrder(null); setEditingInfo(false); }}
         footer={null}
