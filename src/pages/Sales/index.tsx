@@ -716,7 +716,7 @@ const SalesPage: React.FC = () => {
               paymentMethod: values.paymentMethod,
               paymentDate: values.paymentDate.format('YYYY-MM-DD HH:mm:ss'),
               remark: values.remark,
-              createdBy: auth.currentUser?.email || 'Admin',
+              createdBy: auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Admin',
             });
             message.success('收款录入成功');
             setPaymentModalOpen(false);
