@@ -11,7 +11,7 @@ import {
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined,
   DownloadOutlined, FileExcelOutlined,
-  AppstoreOutlined, UnorderedListOutlined, LoadingOutlined
+  AppstoreOutlined, UnorderedListOutlined, LoadingOutlined, PictureOutlined
 } from '@ant-design/icons';
 import { CloudImage } from '../../components/CloudImage';
 
@@ -48,6 +48,8 @@ const ProductsPage: React.FC = () => {
   const [currentImageUrl, setCurrentImageUrl] = useState<string>('');
   const [activeTab, setActiveTab] = useState('products');
   const [logModalOpen, setLogModalOpen] = useState(false);
+  const [bulkImageModalOpen, setBulkImageModalOpen] = useState(false);
+  const [bulkUploadList, setBulkUploadList] = useState<any[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const refreshData = useCallback(async () => {
@@ -215,6 +217,63 @@ const ProductsPage: React.FC = () => {
       message.error('文件解析失败，请检查文件格式');
     }
     return false; // Prevent auto upload
+  };
+
+  // ---- Bulk Image Import ----
+  const handleBulkImageUpload = async (options: any) => {
+    const { file, onSuccess, onError } = options;
+    const f = file as File;
+    const originalName = f.name;
+    const dotIdx = originalName.lastIndexOf('.');
+    const sku = dotIdx !== -1 ? originalName.substring(0, dotIdx).trim() : originalName.trim();
+    
+    const fileId = `upload-${Date.now()}-${Math.random()}`;
+    const newUploadItem = {
+      uid: fileId,
+      name: originalName,
+      sku,
+      status: 'uploading',
+      message: '正在上传到云存储...',
+    };
+    
+    setBulkUploadList(prev => [newUploadItem, ...prev]);
+
+    try {
+      const fileName = `${Date.now()}_${originalName}`;
+      const res = await tcbApp.uploadFile({
+        cloudPath: `products/${fileName}`,
+        filePath: f as any,
+      });
+      const cloudFileID = res.fileID;
+
+      const allProducts = await productDB.getAll();
+      const product = allProducts.find(p => p.sku.toLowerCase() === sku.toLowerCase());
+
+      if (product) {
+        await productDB.update(product.id, { imageUrl: cloudFileID });
+        setBulkUploadList(prev => prev.map(item => 
+          item.uid === fileId 
+            ? { ...item, status: 'success', message: `匹配并成功绑定商品: ${product.name} (${sku})` }
+            : item
+        ));
+        onSuccess?.(cloudFileID);
+        refreshData();
+      } else {
+        setBulkUploadList(prev => prev.map(item => 
+          item.uid === fileId 
+            ? { ...item, status: 'warning', message: `图片已存入云端，但系统未找到产品编码为 "${sku}" 的商品` }
+            : item
+        ));
+        onSuccess?.(cloudFileID);
+      }
+    } catch (err: any) {
+      setBulkUploadList(prev => prev.map(item => 
+        item.uid === fileId 
+          ? { ...item, status: 'error', message: `上传失败: ${err.message || '未知错误'}` }
+          : item
+      ));
+      onError?.(err);
+    }
   };
 
   // Table columns for products
@@ -453,6 +512,12 @@ const ProductsPage: React.FC = () => {
                           onClick={() => { setImportType('product'); setImportModalOpen(true); }}
                         >
                           Excel导入
+                        </Button>
+                        <Button
+                          icon={<PictureOutlined />}
+                          onClick={() => { setBulkUploadList([]); setBulkImageModalOpen(true); }}
+                        >
+                          批量导入图片
                         </Button>
                         <Button icon={<DownloadOutlined />} onClick={() => exportProducts()}>
                           导出
@@ -721,6 +786,78 @@ const ProductsPage: React.FC = () => {
         productName={selectedProduct?.name || ''}
         onClose={() => setLogModalOpen(false)}
       />
+
+      {/* Bulk Image Import Modal */}
+      <Modal
+        title="批量导入图片 (根据编码自动绑定)"
+        open={bulkImageModalOpen}
+        onCancel={() => setBulkImageModalOpen(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setBulkImageModalOpen(false)}>
+            完成
+          </Button>
+        ]}
+        width={650}
+      >
+        <div style={{ marginTop: 16 }}>
+          <Alert
+            message="导入说明"
+            description={
+              <ul style={{ paddingLeft: 16, margin: '8px 0 0' }}>
+                <li>图片文件名应为产品的<strong>产品编码</strong>（如 <code>P-0001.jpg</code> 或 <code>P-0002.png</code>）。</li>
+                <li>支持多张图片同时上传，系统会自动按文件名中的编码在数据库中进行匹配并绑定。</li>
+                <li>支持拖拽文件或文件夹、直接多选选择多张图片上传。</li>
+              </ul>
+            }
+            type="info"
+            style={{ marginBottom: 16 }}
+          />
+
+          <Upload.Dragger
+            accept="image/*"
+            multiple={true}
+            customRequest={handleBulkImageUpload}
+            showUploadList={false}
+          >
+            <p style={{ fontSize: 40, color: 'var(--primary-500)', marginBottom: 8 }}>
+              <PictureOutlined />
+            </p>
+            <p style={{ color: 'var(--text-primary)', fontSize: 14 }}>
+              点击或拖拽多张产品图片到此处
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+              支持常见图片格式 (.jpg, .jpeg, .png, .webp)
+            </p>
+          </Upload.Dragger>
+
+          {bulkUploadList.length > 0 && (
+            <div style={{ marginTop: 20, maxHeight: 300, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 8, padding: 12 }}>
+              <div style={{ fontWeight: 'bold', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                <span>上传历史 ({bulkUploadList.length})</span>
+                <a onClick={() => setBulkUploadList([])} style={{ fontSize: 12, fontWeight: 'normal', cursor: 'pointer' }}>清空记录</a>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {bulkUploadList.map(item => (
+                  <div key={item.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: 'var(--bg-tertiary)', borderRadius: 4 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item.name}</span>
+                      <span style={{ fontSize: 11, color: item.status === 'success' ? '#22c55e' : item.status === 'warning' ? '#f59e0b' : item.status === 'error' ? '#ef4444' : '#6366f1' }}>
+                        {item.message}
+                      </span>
+                    </div>
+                    <div style={{ marginLeft: 12 }}>
+                      {item.status === 'uploading' && <LoadingOutlined style={{ color: '#6366f1' }} />}
+                      {item.status === 'success' && <Tag color="success">成功</Tag>}
+                      {item.status === 'warning' && <Tag color="warning">未匹配</Tag>}
+                      {item.status === 'error' && <Tag color="error">失败</Tag>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 };
