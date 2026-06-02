@@ -190,11 +190,24 @@ const ProposalsPage: React.FC = () => {
             value={searchValue}
             onChange={(val) => handleAddProduct(val)}
             style={{ width: 400 }}
-            optionFilterProp="children"
+            optionFilterProp="searchText"
             filterOption={(input, option) =>
-              (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              (option?.searchText ?? '').toLowerCase().includes(input.toLowerCase())
             }
-            options={allProducts.map(p => ({ label: `${p.name} (${p.spec || '无规格'}) [${p.id.slice(-6)}]`, value: p.id }))}
+            options={allProducts.map(p => ({ 
+              label: (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {p.imageUrl ? (
+                    <CloudImage src={p.imageUrl} style={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 4 }} preview={false} />
+                  ) : (
+                    <div style={{ width: 24, height: 24, background: '#f1f5f9', borderRadius: 4 }} />
+                  )}
+                  <span>{p.name} ({p.spec || '无规格'}) <Text type="secondary" style={{ fontSize: 12 }}>[{p.id.slice(-6)}]</Text></span>
+                </div>
+              ), 
+              value: p.id,
+              searchText: `${p.name} ${p.spec || ''} ${p.id.slice(-6)}`
+            }))}
           />
           <Text type="secondary" style={{ alignSelf: 'center' }}>支持下拉搜索名称，或直接输入后回车。</Text>
         </div>
