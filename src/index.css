@@ -476,3 +476,12 @@ body {
     display: none !important;
   }
 }
+@media print {
+  html, body, #root, .ant-layout, .ant-layout-content, .ant-card, .ant-card-body {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+}
