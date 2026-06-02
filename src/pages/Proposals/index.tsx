@@ -1,23 +1,74 @@
+
 // ========================================
 // 投标标书 - Proposals
 // ========================================
 
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Button, Space, Typography, Popconfirm, message, Upload, Select, Input } from 'antd';
-import { DownloadOutlined, UploadOutlined, DeleteOutlined, FileDoneOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import { DownloadOutlined, UploadOutlined, DeleteOutlined, FileDoneOutlined, ArrowUpOutlined, ArrowDownOutlined, MenuOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import { productDB, categoryDB } from '../../database/db';
 import type { Product, Category } from '../../database/types';
 import { CloudImage } from '../../components/CloudImage';
+
+// dnd-kit
+import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+const { Title, Text } = Typography;
+
+const STORAGE_KEY = 'proposals_draft';
 
 interface SelectedItem {
   id: string;
   remark: string;
 }
 
-const { Title, Text } = Typography;
+interface RowProps extends React.HTMLAttributes<HTMLTableRowElement> {
+  'data-row-key': string;
+}
 
-const STORAGE_KEY = 'proposals_draft';
+const Row = ({ children, ...props }: RowProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: props['data-row-key'],
+  });
+
+  const style: React.CSSProperties = {
+    ...props.style,
+    transform: CSS.Transform.toString(transform && { ...transform, scaleY: 1 }),
+    transition,
+    ...(isDragging ? { position: 'relative', zIndex: 9999 } : {}),
+  };
+
+  return (
+    <tr {...props} ref={setNodeRef} style={style} {...attributes}>
+      {React.Children.map(children, (child) => {
+        if ((child as React.ReactElement).key === 'sort') {
+          return React.cloneElement(child as any, {
+            children: (
+              <MenuOutlined
+                ref={setActivatorNodeRef}
+                style={{ touchAction: 'none', cursor: 'move', color: '#999', fontSize: 16 }}
+                {...listeners}
+              />
+            ),
+          });
+        }
+        return child;
+      })}
+    </tr>
+  );
+};
 
 const ProposalsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -138,10 +189,6 @@ const ProposalsPage: React.FC = () => {
         if (cell && cell.v === '点击查看图片') {
           const product = selectedProducts[R - 1]; // 排除表头
           if (product && product.imageUrl) {
-            // 注意: 这里导出的超链接如果是 cloud://，在 Excel 中会打不开，最好转化为临时的 http 链接，或者让其保持原样。
-            // 简单起见，如果需要在 Excel 直接打开，我们需要调用 getTempFileURL。
-            // 但考虑到导出速度，暂存原图片标识符，在真实业务中客户如需查看大图，我们更推荐在系统中查看，或者在这里尝试解析它。
-            // 这里为了简单，目前不作复杂的 Excel 超链接，如果您有特定需求可以加上。
             cell.l = { Target: product.imageUrl, Tooltip: '打开图片' };
           }
         }
@@ -188,6 +235,24 @@ const ProposalsPage: React.FC = () => {
     };
     reader.readAsArrayBuffer(file);
     return false; // Prevent auto upload
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 1, // 1px
+      },
+    })
+  );
+
+  const onDragEnd = ({ active, over }: any) => {
+    if (active.id !== over?.id) {
+      setSelectedItems((previous) => {
+        const activeIndex = previous.findIndex((i) => i.id === active.id);
+        const overIndex = previous.findIndex((i) => i.id === over?.id);
+        return arrayMove(previous, activeIndex, overIndex);
+      });
+    }
   };
 
   return (
@@ -240,48 +305,64 @@ const ProposalsPage: React.FC = () => {
           <Text type="secondary" style={{ alignSelf: 'center' }}>支持下拉搜索名称，或直接输入后回车。</Text>
         </div>
 
-        <Table
-          dataSource={selectedProducts}
-          rowKey="id"
-          loading={loading}
-          pagination={false}
-          columns={[
-            {
-              title: '图片',
-              dataIndex: 'imageUrl',
-              width: 80,
-              render: (url) => <CloudImage src={url} style={{ width: 40, height: 40, objectFit: 'cover' }} preview />,
-            },
-            { title: '产品名称', dataIndex: 'name', width: 160 },
-            { title: '分类', dataIndex: 'categoryId', width: 100, render: (id) => categories.find(c => c.id === id)?.name || '未分类' },
-            { title: '品牌', dataIndex: 'brand', width: 100 },
-            { title: '规格型号', dataIndex: 'spec', width: 120 },
-            { title: '单位', dataIndex: 'unit', width: 80 },
-            { 
-              title: '销售价', 
-              dataIndex: 'salePrice', 
-              width: 120,
-              render: (v) => <Text strong style={{ color: '#22c55e' }}>¥{Number(v).toFixed(2)}</Text>
-            },
-            { 
-              title: '客户备注',
-              dataIndex: '_remark',
-              width: 200,
-              render: (text, record) => <Input placeholder="添加备注" value={text} onChange={(e) => handleRemarkChange(record.id, e.target.value)} />
-            },
-            {
-              title: '操作',
-              width: 80,
-              render: (_, record, index) => (
-                <Space>
-                  <Button type="text" icon={<ArrowUpOutlined />} size="small" disabled={index === 0} onClick={() => handleMove(index, 'up')} />
-                  <Button type="text" icon={<ArrowDownOutlined />} size="small" disabled={index === selectedItems.length - 1} onClick={() => handleMove(index, 'down')} />
-                  <Button type="text" danger size="small" onClick={() => handleRemove(record.id)}>移除</Button>
-                </Space>
-              )
-            }
-          ]}
-        />
+        <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
+          <SortableContext
+            items={selectedProducts.map((i) => i.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <Table
+              components={{
+                body: {
+                  row: Row,
+                },
+              }}
+              dataSource={selectedProducts}
+              rowKey="id"
+              loading={loading}
+              pagination={false}
+              columns={[
+                {
+                  key: 'sort',
+                  width: 50,
+                },
+                {
+                  title: '图片',
+                  dataIndex: 'imageUrl',
+                  width: 80,
+                  render: (url) => <CloudImage src={url} style={{ width: 40, height: 40, objectFit: 'cover' }} preview />,
+                },
+                { title: '产品名称', dataIndex: 'name', width: 160 },
+                { title: '分类', dataIndex: 'categoryId', width: 100, render: (id) => categories.find(c => c.id === id)?.name || '未分类' },
+                { title: '品牌', dataIndex: 'brand', width: 100 },
+                { title: '规格型号', dataIndex: 'spec', width: 120 },
+                { title: '单位', dataIndex: 'unit', width: 80 },
+                { 
+                  title: '销售价', 
+                  dataIndex: 'salePrice', 
+                  width: 120,
+                  render: (v) => <Text strong style={{ color: '#22c55e' }}>¥{Number(v).toFixed(2)}</Text>
+                },
+                { 
+                  title: '客户备注',
+                  dataIndex: '_remark',
+                  width: 200,
+                  render: (text, record) => <Input placeholder="添加备注" value={text} onChange={(e) => handleRemarkChange(record.id, e.target.value)} />
+                },
+                {
+                  title: '操作',
+                  width: 80,
+                  render: (_, record, index) => (
+                    <Space>
+                      <Button type="text" icon={<ArrowUpOutlined />} size="small" disabled={index === 0} onClick={() => handleMove(index, 'up')} />
+                      <Button type="text" icon={<ArrowDownOutlined />} size="small" disabled={index === selectedItems.length - 1} onClick={() => handleMove(index, 'down')} />
+                      <Button type="text" danger size="small" onClick={() => handleRemove(record.id)}>移除</Button>
+                    </Space>
+                  )
+                }
+              ]}
+            />
+          </SortableContext>
+        </DndContext>
       </Card>
     </div>
   );
