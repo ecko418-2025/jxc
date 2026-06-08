@@ -1,29 +1,53 @@
-import { createConnection } from 'mysql2/promise';
+const { createConnection } = require('mysql2/promise');
+
+function getDbConfig() {
+  const config = {
+    host: process.env.DB_HOST || process.env.MYSQL_HOST || process.env.TCB_MYSQL_HOST,
+    port: process.env.DB_PORT || process.env.MYSQL_PORT || process.env.TCB_MYSQL_PORT || 3306,
+    user: process.env.DB_USER || process.env.MYSQL_USERNAME,
+    password: process.env.DB_PASSWORD || process.env.MYSQL_PASSWORD,
+    database: process.env.DB_NAME
+  };
+
+  const missing = Object.entries(config)
+    .filter(([key, value]) => key !== 'port' && !value)
+    .map(([key]) => key);
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required database environment variables: ${missing.join(', ')}`);
+  }
+
+  return config;
+}
+
+async function runStep(pool, label, sql) {
+  try {
+    await pool.query(sql);
+    console.log(label);
+  } catch (e) {
+    console.log(`${label} skipped: ${e.message}`);
+  }
+}
 
 async function migrate() {
-  const pool = await createConnection({
-    host: '172.17.0.12',
-    user: 'ecko',
-    password: 'xiXI031985',
-    database: 'cshj001-d7g5f1k0tc94d4181'
-  });
+  const pool = await createConnection(getDbConfig());
 
-  try {
-    await pool.query("ALTER TABLE purchase_orders ADD COLUMN ext_order_no VARCHAR(100) DEFAULT '' AFTER status;");
-    console.log("Added ext_order_no to purchase_orders");
-  } catch(e) {
-    console.log("purchase_orders skip: " + e.message);
-  }
+  await runStep(
+    pool,
+    'Added ext_order_no to purchase_orders',
+    "ALTER TABLE purchase_orders ADD COLUMN ext_order_no VARCHAR(100) DEFAULT '' AFTER status;"
+  );
 
-  try {
-    await pool.query("ALTER TABLE sales_orders ADD COLUMN ext_order_no VARCHAR(100) DEFAULT '' AFTER payment_status;");
-    console.log("Added ext_order_no to sales_orders");
-  } catch(e) {
-    console.log("sales_orders skip: " + e.message);
-  }
+  await runStep(
+    pool,
+    'Added ext_order_no to sales_orders',
+    "ALTER TABLE sales_orders ADD COLUMN ext_order_no VARCHAR(100) DEFAULT '' AFTER payment_status;"
+  );
 
-  try {
-    await pool.query(`
+  await runStep(
+    pool,
+    'Created audit_logs table',
+    `
       CREATE TABLE IF NOT EXISTS audit_logs (
         id VARCHAR(36) PRIMARY KEY,
         user_name VARCHAR(100),
@@ -32,14 +56,13 @@ async function migrate() {
         payload JSON,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
-    `);
-    console.log("Created audit_logs table");
-  } catch(e) {
-    console.log("audit_logs skip: " + e.message);
-  }
+    `
+  );
 
-  try {
-    await pool.query(`
+  await runStep(
+    pool,
+    'Created finance_ledgers table',
+    `
       CREATE TABLE IF NOT EXISTS finance_ledgers (
         id VARCHAR(36) PRIMARY KEY,
         type VARCHAR(20),
@@ -52,27 +75,27 @@ async function migrate() {
         created_by VARCHAR(50),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
-    `);
-    console.log("Created finance_ledgers table");
-  } catch(e) {
-    console.log("finance_ledgers skip: " + e.message);
-  }
+    `
+  );
 
-  try {
-    await pool.query("ALTER TABLE purchase_orders ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0.00 AFTER total_amount;");
-    console.log("Added paid_amount to purchase_orders");
-  } catch(e) {
-    console.log("purchase_orders paid_amount skip: " + e.message);
-  }
+  await runStep(
+    pool,
+    'Added paid_amount to purchase_orders',
+    'ALTER TABLE purchase_orders ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0.00 AFTER total_amount;'
+  );
 
-  try {
-    await pool.query("ALTER TABLE sales_orders ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0.00 AFTER total_amount;");
-    console.log("Added paid_amount to sales_orders");
-  } catch(e) {
-    console.log("sales_orders paid_amount skip: " + e.message);
-  }
+  await runStep(
+    pool,
+    'Added paid_amount to sales_orders',
+    'ALTER TABLE sales_orders ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0.00 AFTER total_amount;'
+  );
 
-  process.exit(0);
+  await pool.end();
 }
 
-migrate();
+migrate()
+  .then(() => process.exit(0))
+  .catch((e) => {
+    console.error(e.message);
+    process.exit(1);
+  });

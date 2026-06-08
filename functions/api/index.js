@@ -1,6 +1,15 @@
 // 云函数入口文件
 const mysql = require('mysql2/promise');
 const crypto = require('crypto');
+const { getDbConfig } = require('./dbConfig');
+const { authorizeAction, resolveOperator } = require('./permissions');
+const {
+  buildUpdateClause,
+  CATEGORY_UPDATE_FIELDS,
+  PRODUCT_UPDATE_FIELDS,
+  SUPPLIER_UPDATE_FIELDS,
+  CUSTOMER_UPDATE_FIELDS
+} = require('./updateFields');
 
 // 数据库连接池
 let pool;
@@ -22,7 +31,6 @@ const paymentStatusMap = {
   paid: '已付款',
   refunded: '已退款'
 };
-
 
 async function logAudit(pool, action, payload) {
   if (!action || action.startsWith('get') || action === 'migrate' || action === 'getUserProfile' || action === 'getUserList') return;
@@ -81,31 +89,22 @@ async function logAudit(pool, action, payload) {
 exports.main = async (event, context) => {
   // 1. 初始化数据库连接池 (如果在热启动期间已有连接池，则复用)
   if (!pool) {
-    // 实际使用时，请将这些配置存放在云函数的环境变量中
-    pool = mysql.createPool({
-      // 兼容可能存在的默认环境变量
-      host: process.env.DB_HOST || process.env.MYSQL_HOST || process.env.TCB_MYSQL_HOST || '127.0.0.1',
-      port: process.env.DB_PORT || process.env.MYSQL_PORT || process.env.TCB_MYSQL_PORT || 3306,
-      user: process.env.DB_USER || process.env.MYSQL_USERNAME || 'root',
-      password: process.env.DB_PASSWORD || process.env.MYSQL_PASSWORD || 'password',
-      database: process.env.DB_NAME || 'hotel_inventory',
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      timezone: '+08:00',
-      dateStrings: true
-    });
+    pool = mysql.createPool(getDbConfig());
   }
 
-  const { action, payload, operator } = event;
-  currentOperator = operator;
+  const { action, payload = {} } = event;
   
   if (!action) {
     return { code: 400, message: 'Missing action parameter' };
   }
 
   try {
-    let result;
+    currentOperator = await resolveOperator(pool, event, context);
+    const authError = authorizeAction(action, currentOperator);
+    if (authError) {
+      return { code: 403, message: authError };
+    }
+
     switch (action) {
       // =============== Categories ===============
       case 'getCategories': {
@@ -165,13 +164,12 @@ exports.main = async (event, context) => {
         await logAudit(pool, action, payload); return { code: 200, message: 'Success', data: { id } };
       }
       case 'updateCategory': {
-        const { id, ...updateFields } = payload;
-        if (Object.keys(updateFields).length === 0) {
+        const { id } = payload;
+        const { setClause, values } = buildUpdateClause(payload, CATEGORY_UPDATE_FIELDS);
+        if (!setClause) {
           await logAudit(pool, action, payload); 
           return { code: 200 };
         }
-        const setClause = Object.keys(updateFields).map(k => `${k.replace('parentId', 'parent_id')} = ?`).join(', ');
-        const values = Object.values(updateFields);
         await pool.query(`UPDATE categories SET ${setClause} WHERE id = ?`, [...values, id]);
         await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
@@ -222,17 +220,9 @@ exports.main = async (event, context) => {
         await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
       }
       case 'updateProduct': {
-        const { id, ...rest } = payload;
-        const updateFields = { ...rest };
-        if (updateFields.categoryId) { updateFields.category_id = updateFields.categoryId; delete updateFields.categoryId; }
-        if (updateFields.purchasePrice !== undefined) { updateFields.purchase_price = updateFields.purchasePrice; delete updateFields.purchasePrice; }
-        if (updateFields.salePrice !== undefined) { updateFields.sale_price = updateFields.salePrice; delete updateFields.salePrice; }
-        if (updateFields.minStock !== undefined) { updateFields.min_stock = updateFields.minStock; delete updateFields.minStock; }
-        if (updateFields.imageUrl !== undefined) { updateFields.image_url = updateFields.imageUrl; delete updateFields.imageUrl; }
-
-        if (Object.keys(updateFields).length > 0) {
-          const setClause = Object.keys(updateFields).map(k => `${k} = ?`).join(', ');
-          const values = Object.values(updateFields);
+        const { id } = payload;
+        const { setClause, values } = buildUpdateClause(payload, PRODUCT_UPDATE_FIELDS);
+        if (setClause) {
           await pool.query(`UPDATE products SET ${setClause} WHERE id = ?`, [...values, id]);
         }
         await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
@@ -265,12 +255,9 @@ exports.main = async (event, context) => {
         await logAudit(pool, action, payload); return { code: 200, message: 'Success', data: { id } };
       }
       case 'updateSupplier': {
-        const { id, ...rest } = payload;
-        const updateFields = { ...rest };
-        if (updateFields.bankAccount !== undefined) { updateFields.bank_account = updateFields.bankAccount; delete updateFields.bankAccount; }
-        if (Object.keys(updateFields).length > 0) {
-          const setClause = Object.keys(updateFields).map(k => `${k} = ?`).join(', ');
-          const values = Object.values(updateFields);
+        const { id } = payload;
+        const { setClause, values } = buildUpdateClause(payload, SUPPLIER_UPDATE_FIELDS);
+        if (setClause) {
           await pool.query(`UPDATE suppliers SET ${setClause} WHERE id = ?`, [...values, id]);
         }
         await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
@@ -295,12 +282,9 @@ exports.main = async (event, context) => {
         await logAudit(pool, action, payload); return { code: 200, message: 'Success', data: { id } };
       }
       case 'updateCustomer': {
-        const { id, ...rest } = payload;
-        const updateFields = { ...rest };
-        if (updateFields.creditLimit !== undefined) { updateFields.credit_limit = updateFields.creditLimit; delete updateFields.creditLimit; }
-        if (Object.keys(updateFields).length > 0) {
-          const setClause = Object.keys(updateFields).map(k => `${k} = ?`).join(', ');
-          const values = Object.values(updateFields);
+        const { id } = payload;
+        const { setClause, values } = buildUpdateClause(payload, CUSTOMER_UPDATE_FIELDS);
+        if (setClause) {
           await pool.query(`UPDATE customers SET ${setClause} WHERE id = ?`, [...values, id]);
         }
         await logAudit(pool, action, payload); return { code: 200, message: 'Success' };
@@ -722,6 +706,9 @@ exports.main = async (event, context) => {
 
       case 'createFinanceLedger': {
         const { type, partyId, orderId, amount, paymentMethod, paymentDate, remark, createdBy } = payload;
+        if (currentOperator.role === 'sales' && type !== 'income') {
+          return { code: 403, message: 'Forbidden: Sales can only create income ledgers' };
+        }
         const id = crypto.randomUUID();
         
         const connection = await pool.getConnection();

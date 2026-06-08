@@ -1,5 +1,5 @@
 {
-  "envId": "cshj001-d7g5f1k0tc94d4181",
+  "envId": "your-cloudbase-env-id",
   "version": "2.0",
   "framework": {
     "name": "hotel-inventory"
@@ -22,10 +22,10 @@
         "subnetId": "subnet-4dmrxqvp"
       },
       "envVariables": {
-        "DB_HOST": "172.17.0.12",
+        "DB_HOST": "your_db_host",
         "DB_USER": "your_db_username",
         "DB_PASSWORD": "your_db_password",
-        "DB_NAME": "cshj001-d7g5f1k0tc94d4181"
+        "DB_NAME": "your_db_name"
       },
       "runtime": "Nodejs16.13",
       "memorySize": 256

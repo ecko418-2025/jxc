@@ -1,16 +1,28 @@
-const { createConnection } = require('mysql2/promise');
-
 function getDbConfig() {
   const config = {
     host: process.env.DB_HOST || process.env.MYSQL_HOST || process.env.TCB_MYSQL_HOST,
     port: process.env.DB_PORT || process.env.MYSQL_PORT || process.env.TCB_MYSQL_PORT || 3306,
     user: process.env.DB_USER || process.env.MYSQL_USERNAME,
     password: process.env.DB_PASSWORD || process.env.MYSQL_PASSWORD,
-    database: process.env.DB_NAME
+    database: process.env.DB_NAME,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    timezone: '+08:00',
+    dateStrings: true
   };
 
+  const optionalKeys = new Set([
+    'port',
+    'waitForConnections',
+    'connectionLimit',
+    'queueLimit',
+    'timezone',
+    'dateStrings'
+  ]);
+
   const missing = Object.entries(config)
-    .filter(([key, value]) => key !== 'port' && !value)
+    .filter(([key, value]) => !optionalKeys.has(key) && !value)
     .map(([key]) => key);
 
   if (missing.length > 0) {
@@ -20,16 +32,6 @@ function getDbConfig() {
   return config;
 }
 
-async function clean() {
-  const pool = await createConnection(getDbConfig());
-  await pool.query("DELETE FROM audit_logs WHERE action_type LIKE 'get%'");
-  await pool.end();
-  console.log('Cleaned');
-}
-
-clean()
-  .then(() => process.exit(0))
-  .catch((e) => {
-    console.error(e.message);
-    process.exit(1);
-  });
+module.exports = {
+  getDbConfig
+};
