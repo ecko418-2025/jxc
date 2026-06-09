@@ -8,7 +8,14 @@ import { UserOutlined, LockOutlined, ShopOutlined } from '@ant-design/icons';
 import { auth } from '../../database/db';
 import { message } from '../../utils/antd';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
+
+const quickLoginUsers = [
+  { label: '管理员', username: 'ecko418', password: 'Ecko0418' },
+  { label: '销售', username: 'test1234s', password: 'Test1234' },
+  { label: '仓储', username: 'test1234v', password: 'Test1234' },
+  { label: '财务', username: 'test1234c', password: 'Test1234' },
+];
 
 interface LoginProps {
   onSuccess: () => void;
@@ -35,6 +42,10 @@ const LoginPage: React.FC<LoginProps> = ({ onSuccess }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleQuickLogin = (username: string, password: string) => {
+    handleLogin({ username, password });
   };
 
   return (
@@ -67,7 +78,6 @@ const LoginPage: React.FC<LoginProps> = ({ onSuccess }) => {
             <ShopOutlined style={{ fontSize: 32, color: '#fff' }} />
           </div>
           <Title level={3} style={{ color: '#fff', margin: 0 }}>酒店进销存管理系统</Title>
-          <Text style={{ color: 'var(--text-secondary)' }}>云端协同版本 v2.0</Text>
         </div>
 
         <Form
@@ -112,11 +122,20 @@ const LoginPage: React.FC<LoginProps> = ({ onSuccess }) => {
             </Button>
           </Form.Item>
         </Form>
-        
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <Text style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-            请使用管理员在腾讯云后台创建的邮箱账号登录
-          </Text>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginTop: 16 }}>
+          {quickLoginUsers.map(user => (
+            <Button
+              key={user.username}
+              type="default"
+              block
+              loading={loading}
+              onClick={() => handleQuickLogin(user.username, user.password)}
+              style={{ height: 40, background: 'rgba(15, 23, 42, 0.5)', borderColor: 'rgba(255,255,255,0.12)', color: '#f1f5f9' }}
+            >
+              {user.label}快捷登录
+            </Button>
+          ))}
         </div>
       </Card>
     </div>
