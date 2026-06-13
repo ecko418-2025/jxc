@@ -26,6 +26,14 @@ const App: React.FC = () => {
   const [loading, setLoading] = React.useState(true);
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
   const [userRole, setUserRole] = React.useState<string | null>(null);
+  const [themeMode, setThemeMode] = React.useState<'dark' | 'light'>(() => {
+    return localStorage.getItem('ui_theme') === 'light' ? 'light' : 'dark';
+  });
+
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+    localStorage.setItem('ui_theme', themeMode);
+  }, [themeMode]);
 
   React.useEffect(() => {
     // 监听登录状态
@@ -104,21 +112,21 @@ const App: React.FC = () => {
     <ConfigProvider
       locale={zhCN}
       theme={{
-        algorithm: theme.darkAlgorithm,
+        algorithm: themeMode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
           colorPrimary: '#6366f1',
-          colorBgContainer: '#1e293b',
-          colorBgElevated: '#1e293b',
-          colorBorder: 'rgba(148, 163, 184, 0.15)',
-          colorText: '#f1f5f9',
-          colorTextSecondary: '#94a3b8',
+          colorBgContainer: themeMode === 'dark' ? '#1e293b' : '#fffdf7',
+          colorBgElevated: themeMode === 'dark' ? '#1e293b' : '#fffdf7',
+          colorBorder: themeMode === 'dark' ? 'rgba(148, 163, 184, 0.15)' : '#d8cfbf',
+          colorText: themeMode === 'dark' ? '#f1f5f9' : '#172033',
+          colorTextSecondary: themeMode === 'dark' ? '#94a3b8' : '#475569',
           borderRadius: 8,
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         },
         components: {
           Table: {
-            headerBg: '#334155',
-            rowHoverBg: 'rgba(51, 65, 85, 0.6)',
+            headerBg: themeMode === 'dark' ? '#334155' : '#eee7d9',
+            rowHoverBg: themeMode === 'dark' ? 'rgba(51, 65, 85, 0.6)' : '#f3ede2',
           },
           Card: {
             headerBg: 'transparent',
@@ -130,7 +138,14 @@ const App: React.FC = () => {
         <AntdStaticExtractor />
         <Router>
           <Routes>
-            <Route element={<AppLayout />}>
+            <Route
+              element={(
+                <AppLayout
+                  themeMode={themeMode}
+                  onThemeChange={() => setThemeMode(current => current === 'dark' ? 'light' : 'dark')}
+                />
+              )}
+            >
               <Route path="/" element={<Dashboard />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/purchase" element={<PurchasePage />} />

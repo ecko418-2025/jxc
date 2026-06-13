@@ -109,7 +109,7 @@ const InventoryPage: React.FC = () => {
       title: '图片',
       dataIndex: 'imageUrl',
       width: 60,
-      render: (url: string) => url ? <CloudImage src={url} alt="img" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 40, height: 40, background: '#334155', borderRadius: 4 }} />,
+      render: (url: string) => url ? <CloudImage src={url} alt="img" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 40, height: 40, background: 'var(--bg-tertiary)', borderRadius: 4 }} />,
     },
     {
       title: '编码',

@@ -3,7 +3,7 @@
 // ========================================
 
 import React, { useState } from 'react';
-import { Layout, Menu, Typography, Space, Badge, Avatar, Tooltip, Dropdown } from 'antd';
+import { Layout, Menu, Typography, Space, Badge, Avatar, Tooltip, Dropdown, Button } from 'antd';
 import {
   DashboardOutlined,
   ShoppingOutlined,
@@ -18,12 +18,19 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   BellOutlined,
+  BulbOutlined,
+  MoonOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { inventoryDB, auth } from '../database/db';
 
 const { Sider, Header, Content } = Layout;
 const { Text } = Typography;
+
+interface AppLayoutProps {
+  themeMode: 'dark' | 'light';
+  onThemeChange: () => void;
+}
 
 const menuItems = [
   { key: '/', icon: <DashboardOutlined />, label: '数据看板' },
@@ -39,7 +46,7 @@ const menuItems = [
   { key: '/settings', icon: <SettingOutlined />, label: '系统设置' },
 ];
 
-const AppLayout: React.FC = () => {
+const AppLayout: React.FC<AppLayoutProps> = ({ themeMode, onThemeChange }) => {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -139,7 +146,7 @@ const AppLayout: React.FC = () => {
 
         {/* Menu */}
         <Menu
-          theme="dark"
+          theme={themeMode}
           mode="inline"
           selectedKeys={[location.pathname]}
           onClick={({ key }) => navigate(key)}
@@ -181,9 +188,19 @@ const AppLayout: React.FC = () => {
           </Space>
 
           <Space size={20}>
+            <Tooltip title={themeMode === 'dark' ? '切换到明亮模式' : '切换到深色模式'}>
+              <Button
+                type="text"
+                shape="circle"
+                aria-label={themeMode === 'dark' ? '切换到明亮模式' : '切换到深色模式'}
+                icon={themeMode === 'dark' ? <BulbOutlined /> : <MoonOutlined />}
+                onClick={onThemeChange}
+                style={{ color: 'var(--text-secondary)', fontSize: 18 }}
+              />
+            </Tooltip>
             <div style={{ display: collapsed ? 'none' : 'flex', alignItems: 'center', gap: '8px' }}>
               <Text strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{displayName}</Text>
-              <span style={{ fontSize: 11, color: '#6366f1', background: 'rgba(99, 102, 241, 0.1)', padding: '2px 8px', borderRadius: '4px', fontWeight: 500 }}>{roleLabel}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-accent)', background: 'rgba(99, 102, 241, 0.12)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>{roleLabel}</span>
             </div>
 
             {role !== 'warehouse' && (

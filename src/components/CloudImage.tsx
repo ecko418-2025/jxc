@@ -59,7 +59,7 @@ export const CloudImage: React.FC<CloudImageProps> = ({ src, alt, style, preview
   }, [src]);
 
   if (!url) {
-    return <div style={{ ...style, background: '#334155' }} />;
+    return <div style={{ ...style, background: 'var(--bg-tertiary)' }} />;
   }
 
   return (
