@@ -117,6 +117,69 @@ body {
   overflow: hidden;
 }
 
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+}
+
+.login-card.ant-card {
+  width: 100%;
+  max-width: 400px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(10px);
+}
+
+.login-title.ant-typography {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.login-input.ant-input-affix-wrapper {
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+.login-input.ant-input-affix-wrapper:hover,
+.login-input.ant-input-affix-wrapper:focus,
+.login-input.ant-input-affix-wrapper-focused {
+  border-color: var(--primary-500);
+}
+
+.login-input .ant-input,
+.login-input .ant-input-password-icon,
+.login-input .anticon {
+  color: var(--text-primary);
+}
+
+.login-input .ant-input {
+  background: transparent;
+}
+
+.login-input .anticon {
+  color: var(--text-muted);
+}
+
+.quick-login-button.ant-btn {
+  height: 40px;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+.quick-login-button.ant-btn:hover:not(:disabled) {
+  color: var(--primary-600);
+  background: var(--bg-card-hover);
+  border-color: var(--primary-500);
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

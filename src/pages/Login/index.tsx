@@ -21,23 +21,38 @@ interface LoginProps {
   onSuccess: () => void;
 }
 
+interface LoginValues {
+  username: string;
+  password: string;
+}
+
+const getLoginError = (error: unknown) => {
+  if (error instanceof Error) {
+    const code = 'code' in error && typeof error.code === 'string' ? error.code : '';
+    return { code, message: error.message };
+  }
+
+  return { code: '', message: '' };
+};
+
 const LoginPage: React.FC<LoginProps> = ({ onSuccess }) => {
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (values: any) => {
+  const handleLogin = async (values: LoginValues) => {
     setLoading(true);
     try {
       await auth.signInWithUsernameAndPassword(values.username, values.password);
       message.success('登录成功！');
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
-      if (error.code === 'AUTH_CUSTOM_ERROR' || error.message?.includes('password')) {
+      const loginError = getLoginError(error);
+      if (loginError.code === 'AUTH_CUSTOM_ERROR' || loginError.message.includes('password')) {
          message.error('账号或密码错误');
-      } else if (error.code === 'INVALID_PARAM') {
+      } else if (loginError.code === 'INVALID_PARAM') {
          message.error('用户名格式不正确');
       } else {
-         message.error('登录失败: ' + (error.message || '未知错误'));
+         message.error('登录失败: ' + (loginError.message || '未知错误'));
       }
     } finally {
       setLoading(false);
@@ -49,23 +64,9 @@ const LoginPage: React.FC<LoginProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-      padding: 20
-    }}>
+    <div className="login-page">
       <Card
-        style={{
-          width: '100%',
-          maxWidth: 400,
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          background: 'rgba(30, 41, 59, 0.8)',
-          backdropFilter: 'blur(10px)'
-        }}
+        className="login-card"
         styles={{ body: { padding: '40px 32px' } }}
       >
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
@@ -77,7 +78,7 @@ const LoginPage: React.FC<LoginProps> = ({ onSuccess }) => {
           }}>
             <ShopOutlined style={{ fontSize: 32, color: '#fff' }} />
           </div>
-          <Title level={3} style={{ color: '#fff', margin: 0 }}>酒店进销存管理系统</Title>
+          <Title level={3} className="login-title">酒店进销存管理系统</Title>
         </div>
 
         <Form
@@ -93,9 +94,8 @@ const LoginPage: React.FC<LoginProps> = ({ onSuccess }) => {
             ]}
           >
             <Input 
-              prefix={<UserOutlined style={{ color: 'var(--text-muted)' }} />} 
-              placeholder="请输入用户名" 
-              style={{ background: 'rgba(15, 23, 42, 0.6)', borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }}
+              prefix={<UserOutlined />}
+              className="login-input"
             />
           </Form.Item>
 
@@ -104,9 +104,8 @@ const LoginPage: React.FC<LoginProps> = ({ onSuccess }) => {
             rules={[{ required: true, message: '请输入密码' }]}
           >
             <Input.Password
-              prefix={<LockOutlined style={{ color: 'var(--text-muted)' }} />}
-              placeholder="密码"
-              style={{ background: 'rgba(15, 23, 42, 0.6)', borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }}
+              prefix={<LockOutlined />}
+              className="login-input"
             />
           </Form.Item>
 
@@ -131,7 +130,7 @@ const LoginPage: React.FC<LoginProps> = ({ onSuccess }) => {
               block
               loading={loading}
               onClick={() => handleQuickLogin(user.username, user.password)}
-              style={{ height: 40, background: 'rgba(15, 23, 42, 0.5)', borderColor: 'rgba(255,255,255,0.12)', color: '#f1f5f9' }}
+              className="quick-login-button"
             >
               {user.label}快捷登录
             </Button>
